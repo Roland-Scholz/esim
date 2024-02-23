@@ -1,0 +1,3745 @@
+z80.asm:
+     1                          
+     2                          CR:		equ	0dh
+     3                          LF:		equ	0ah
+     4                          C_XON		equ	17
+     5                          C_XOFF		equ	19
+     6                          
+     7                          
+     8                          VARS		equ	$ef00			;stack grows downwards from this address
+     9                          sum:		equ	0
+    10                          addr:		equ	1
+    11                          echo:		equ	3			;0 = off, 1 = on
+    12                          xonxoff		equ	4			;0 = transmit, 1 = stop
+    13                          
+    14                          TXD		equ	051h
+    15                          
+    16                          ;
+    17                          
+    18                          		ORG     0000h
+    19                          
+    20                          ;--------------------------------------------------
+    21                          ; Code executed after Reset
+    22                          ;--------------------------------------------------
+    23   000000 f3              		di      			; disable interrupt
+    24   000001 af              		xor     a			; set a to zero
+    25   000002 3d              restime:	dec     a			; do 256 times nothing
+    26   000003 20fd            		jr      nz, restime		; loop
+    27                          
+    28   000005 21a800          		ld      hl, portval		; init 11 ports with values at 0a3h
+    29   000008 060b            		ld      b, 0bh
+    30   00000a 4e              portinit:	ld      c, (hl)
+    31   00000b 23              		inc     hl
+    32   00000c eda3            		outi
+    33   00000e 20fa            		jr      nz, portinit		; loop
+    34                          
+    35   000010 2100f0          		ld      hl,0f000h
+    36   000013 3e01            		ld      a, 01h
+    37   000015 0610            testram2:	ld      b, 10h			; test ram @F000-FFFF
+    38   000017 77              testram:	ld      (hl),a
+    39   000018 07              		rlca
+    40   000019 2c              		inc     l
+    41   00001a 20fb            		jr      nz, testram
+    42   00001c 24              		inc     h
+    43   00001d 10f8            		djnz    testram
+    44                          
+    45   00001f 0e10            		ld      c, 10h
+    46   000021 2b              testram1:	dec     hl
+    47   000022 0f              		rrca
+    48   000023 be              		cp      (hl)
+    49   000024 20fe            ramerr:		jr      nz, ramerr		; if error, loop forever
+    50   000026 10f9            		djnz    testram1
+    51   000028 0d              		dec     c
+    52   000029 20f6            		jr      nz, testram1
+    53   00002b 87              		add     a, a
+    54   00002c 20e7            		jr      nz, testram2
+    55                          
+    56                          ;		ld      hl, 0			; copy rom to ram
+    57                          ;		ld      de, 0
+    58                          ;		ld      bc, 02000h
+    59                          ;		ldir
+    60                          ;		ld      a, 01h
+    61                          ;		out     (52h), a
+    62                          
+    63   00002e 21be00          		ld      hl, sallycode		; copy BIOS from $00b9 to $f000
+    64   000031 1100f0          		ld      de, 0f000h		; length efc
+    65   000034 01fc0e          		ld      bc, 0efch
+    66   000037 edb0            		ldir
+    67   000039 21ba0f          		ld      hl, sallycode + 0fb5h - 0b9h ; copy from fb5 to $ff20
+    68   00003c 1120ff          		ld      de, 0ff20h		; length $2F
+    69   00003f 012f00          		ld      bc, 002fh
+    70   000042 edb0            		ldir
+    71                          
+    72   000044 af              		xor     a			; fill up to $FFFF with zeros
+    73   000045 12              ramfill:	ld      (de),a
+    74   000046 1c              		inc     e
+    75   000047 20fc            		jr      nz, ramfill
+    76                          
+    77   000049 3110ff          		ld      sp,0ff10h		; stack-pointer to 0ff10h
+    78                          
+    79   00004c 3eff            		ld      a,0ffh			; load interrupt-vector register
+    80   00004e ed47            		ld      i,a			; with 0ffh
+    81   000050 ed5e            		im      2			; enable interrupt mode 2 (vectored)
+    82                          
+    83   000052 3e4f            		ld      a,4fh			; select drive 1-4, Motor off, side 0, B/S=1, DD
+    84   000054 d330            		out     (30h),a
+    85                          
+    86   000056 57              		ld      d, a			; d = 4fh
+    87   000057 060a            		ld      b, 10			; step 5 times
+    88                          stepin:
+    89   000059 3e4b            		ld      a, 4bh			; 4b = 0100 1011 = step-in
+    90   00005b cd6bf3          		call    0f36bh			; write A to FDC command and wait
+    91   00005e 10f9            		djnz    stepin
+    92                          
+    93   000060 0664            		ld      b, 64h			; seek track 00 for all 4 drives
+    94   000062 7a              outloop1:	ld      a, d			; select all drives
+    95   000063 d330            		out     (30h),a
+    96   000065 e3              		ex      (sp),hl			; ???
+    97   000066 e3              		ex      (sp),hl			; ???
+    98   000067 3e6b            		ld      a, 6bh			; step out
+    99   000069 cd6bf3          		call    0f36bh			; write A to FDC command and wait
+   100                          
+   101   00006c 1e01            		ld      e, 01h
+   102   00006e 7b              outloop:	ld      a, e
+   103   00006f f640            		or      40h
+   104   000071 d330            		out     (30h), a		; selct one drive
+   105   000073 e3              		ex      (sp), hl
+   106   000074 e3              		ex      (sp), hl
+   107   000075 cd91f3          		call    0f391h			; stop command, get status
+   108   000078 cb57            		bit     2, a
+   109   00007a 2804            		jr      z, excldrv		; bit not set, not at track 00
+   110   00007c 7b              		ld      a, e			; drive at track 00
+   111   00007d 2f              		cpl     			; exclude drive from seeking
+   112   00007e a2              		and     d
+   113   00007f 57              		ld      d, a
+   114                          excldrv:
+   115   000080 cb23            		sla     e
+   116   000082 cb63            		bit     4, e
+   117   000084 28e8            		jr      z, outloop		; status checked for all 4 drives?
+   118   000086 10da            		djnz    outloop1		; step out again
+   119                          
+   120                          
+   121   000088 cd68f0          		call    0f068h			; deselect floppies and seek current track?
+   122                          
+   123   00008b 215eff          		ld      hl, 0ff5eh		; set bit for each connected floppy?
+   124   00008e 011000          		ld      bc, 0010h
+   125   000091 3e04            		ld      a, 04h
+   126   000093 cb1a            nextdrv:	rr      d
+   127   000095 3802            		jr      c, noset
+   128   000097 cbf6            		set     6, (hl)
+   129   000099 09              noset:		add     hl, bc
+   130   00009a 3d              		dec     a
+   131   00009b 20f6            		jr      nz, nextdrv
+   132                          
+   133   00009d 3100c1          		ld      sp, 0c100h		; set stack to 0c100h
+   134                          
+   135                          ;tloop:		in	a, (70h)
+   136                          ;		rlca
+   137                          ;		and	1
+   138                          ;		add	65
+   139                          ;		call	conout
+   140                          ;		jp	tloop
+   141                          ;
+   142                          ;		ld      a, 01h			; ROM SW
+   143                          ;		out     (52h), a
+   144                          
+   145                          ;		ld      a,47h			; CH0 noint+counter+pre16+falling autocnt+timeconst+reset+ctrl
+   146                          ;		out     (80h),a			;        	 4              	7
+   147                          ;;		xor     a
+   148                          ;		out     (80h),a			; counter init value 0
+   149                          ;
+   150                          ;waits:		in      a,(80h)			; counter zero?
+   151                          ;		call	printhex
+   152                          ;		jr	waits
+   153                          
+   154                          
+   155                          
+   156                          ;get2siol:	ld      hl, 0c2feh
+   157                          ;		call    get2sio
+   158                          ;		push	af
+   159                          ;		ld	a, '.'
+   160                          ;		call	conout
+   161                          ;		pop	af
+   162                          ;		jr      nc, get2siol
+   163                          ;
+   164                          ;		ld	hl, (0c2feh)
+   165                          ;		ld	a, l
+   166                          ;		call	printhex
+   167                          ;		ld	a, h
+   168                          ;		call	printhex
+   169                          ;
+   170                          ;		jp	printmenu
+   171                          
+   172   0000a0 3e2a            		ld	a, '*'
+   173   0000a2 cd5311          		call	conout
+   174   0000a5 c362f7          		jp      0f762h			; jump to code in DRAM
+   175                          ;
+   176                          ;get2sio:
+   177                          ;		ld      de,0aaah		; read atari ser 19200 Baud
+   178                          ;		ld      bc,0000h
+   179                          ;		jr      getstartbit
+   180                          ;gotstartbit:
+   181                          ;		ld      a, c			; checksum in c
+   182                          ;		add     a, b
+   183                          ;		adc     a, 00h
+   184                          ;		ld      c, a
+   185                          ;		ex      (sp), hl
+   186                          ;		ex      (sp), hl
+   187                          ;		ex      (sp), hl
+   188                          ;		ex      (sp), hl
+   189                          ;		ld      b, 08h			; 7
+   190                          ;loopbit:
+   191                          ;		ld      a, 0bh			; 7
+   192                          ;		ld      a, 0bh			; 7
+   193                          ;		nop     				; 4
+   194                          ;loop19200:	dec     a			; 4	11*14
+   195                          ;		jp      nz, loop19200		; 10
+   196                          ;		in      a,(70h)			; 11
+   197                          ;		rla     			; 4
+   198                          ;		rr      d			; 8
+   199                          ;		djnz    loopbit         	; 13	208
+   200                          ;		ld      b, d
+   201                          ;;		ld	a, d
+   202                          ;;		call	printhex
+   203                          ;		ld      (hl), d
+   204                          ;		inc     hl
+   205                          ;		ld      a, h
+   206                          ;		cp      0c3h
+   207                          ;		ccf
+   208                          ;		ret     c			; 2bytes read and carry set
+   209                          ;
+   210                          ;getstartbit:
+   211                          ;		ld      a,47h			; CH0 noint+counter+pre16+falling autocnt+timeconst+reset+ctrl
+   212                          ;		out     (80h),a			;        	 4              	7
+   213                          ;		xor     a
+   214                          ;		out     (80h),a			; counter init value 0
+   215                          ;		ld      de,01a1h
+   216                          ;waitstart:
+   217                          ;		in      a,(80h)			; counter zero?
+   218                          ;		or      a
+   219                          ;		jr      nz, gotstartbit         ; start-bit
+   220                          ;
+   221                          ;		dec     de
+   222                          ;		ld      a, d
+   223                          ;		or      e
+   224                          ;		jr      nz, waitstart
+   225                          ;		ret     			; return carry clear, zero
+   226                          ;--------------------------------------------------
+   227                          ; 11 times port:value
+   228                          ;--------------------------------------------------
+   229   0000a8 5001            portval:	db	050h, 001h
+   230   0000aa 5101            		db	051h, 001h
+   231   0000ac 8003            		db	080h, 003h
+   232   0000ae 8010            		db 	080h, 010h
+   233   0000b0 8107            		db	081h, 007h
+   234   0000b2 8101            		db	081h, 001h
+   235   0000b4 8203            		db	082h, 003h
+   236   0000b6 8303            		db	083h, 003h
+   237   0000b8 5701            		db	057h, 001h
+   238   0000ba 3000            		db	030h, 000h
+   239   0000bc 40d0            		db	040h, 0d0h
+   240                          
+   241                          sallycode:
+   242                          
+   243                          		include "C:\github\Sally-1\SALLY-F000-conv.asm"
+C:/github/Sally-1/SALLY-F000-conv.asm:
+     1                          ; Disassembly of the file "C:\github\Sally-1\SALLY-F000.bin"
+     2                          ;
+     3                          ; CPU Type: Z80
+     4                          ;
+     5                          ; Created with dZ80 2.0
+     6                          ;
+     7                          ; on Tuesday, 30 of January 2024 at 11:36 PM
+     8                          ;
+     9   0000be c31bf0          		jp	0f01bh
+    10   0000c1 c3def3          		jp	0f3deh
+    11   0000c4 c335f6          		jp	0f635h
+    12   0000c7 c340f6          		jp	0f640h
+    13   0000ca c350f6          		jp	0f650h
+    14   0000cd c322f0          		jp	0f022h
+    15   0000d0 c3dcf4          		jp	0f4dch
+    16   0000d3 c3ebf4          		jp	0f4ebh
+    17   0000d6 c315f6          		jp	0f615h
+    18   0000d9 f3              		di
+    19   0000da af              		xor	a
+    20   0000db d352            		out	(52h),a
+    21   0000dd c30000          		jp	0000h
+    22   0000e0 cdcbf3          		call	0f3cbh
+    23   0000e3 dd7e00          		ld	a,(ix+00h)
+    24   0000e6 b7              		or	a
+    25   0000e7 284d            		jr	z,ASMPC + 2 + 77		; (+4dh)
+    26   0000e9 0688            		ld	b,88h
+    27   0000eb 3d              		dec	a
+    28   0000ec 287b            		jr	z,ASMPC + 2 + 123		; (+7bh)
+    29   0000ee 06a8            		ld	b,0a8h
+    30   0000f0 3d              		dec	a
+    31   0000f1 2876            		jr	z,ASMPC + 2 + 118		; (+76h)
+    32   0000f3 3d              		dec	a
+    33   0000f4 285f            		jr	z,ASMPC + 2 + 95		; (+5fh)
+    34   0000f6 dd3608ff        		ld	(ix+08h),0ffh
+    35   0000fa f3              		di
+    36   0000fb 3ea7            		ld	a,0a7h
+    37   0000fd d383            		out	(83h),a
+    38   0000ff af              		xor	a
+    39   000100 d383            		out	(83h),a
+    40   000102 3d              		dec	a
+    41   000103 32c9ff          		ld	(0ffc9h),a
+    42   000106 2150f0          		ld	hl,0f050h
+    43   000109 2216ff          		ld	(0ff16h),hl
+    44   00010c fb              		ei
+    45   00010d c9              		ret
+    46                          
+    47   00010e f5              		push	af
+    48   00010f 3ac9ff          		ld	a,(0ffc9h)
+    49   000112 3d              		dec	a
+    50   000113 32c9ff          		ld	(0ffc9h),a
+    51   000116 200a            		jr	nz,ASMPC + 2 + 10		; (+0ah)
+    52   000118 cd68f0          		call	0f068h
+    53   00011b 3e21            		ld	a,21h
+    54   00011d d383            		out	(83h),a
+    55   00011f 322eff          		ld	(0ff2eh),a
+    56   000122 f1              		pop	af
+    57   000123 fb              		ei
+    58   000124 ed4d            		reti
+    59                          
+    60   000126 db41            		in	a,(41h)
+    61   000128 d343            		out	(43h),a
+    62   00012a 3e10            		ld	a,10h
+    63   00012c d340            		out	(40h),a
+    64   00012e 3a2fff          		ld	a,(0ff2fh)
+    65   000131 e6f0            		and	0f0h
+    66   000133 d330            		out	(30h),a
+    67   000135 c9              		ret
+    68                          
+    69   000136 cd1af1          		call	0f11ah
+    70   000139 cb7f            		bit	7,a
+    71   00013b 2805            		jr	z,ASMPC + 2 + 5		; (+05h)
+    72   00013d 2130ff          		ld	hl,0ff30h
+    73   000140 3600            		ld	(hl),00h
+    74   000142 dd7708          		ld	(ix+08h),a
+    75   000145 3a2fff          		ld	a,(0ff2fh)
+    76   000148 dd7706          		ld	(ix+06h),a
+    77   00014b 3a30ff          		ld	a,(0ff30h)
+    78   00014e dd7707          		ld	(ix+07h),a
+    79   000151 cd3cf0          		call	0f03ch
+    80   000154 c9              		ret
+    81                          
+    82   000155 dd360606        		ld	(ix+06h),06h
+    83   000159 dd360700        		ld	(ix+07h),00h
+    84   00015d 06c0            		ld	b,0c0h
+    85   00015f cdb3f0          		call	0f0b3h
+    86   000162 3a2fff          		ld	a,(0ff2fh)
+    87   000165 dd7706          		ld	(ix+06h),a
+    88   000168 c9              		ret
+    89                          
+    90   000169 ddcb017e        		bit	7,(ix+01h)
+    91   00016d 2802            		jr	z,ASMPC + 2 + 2		; (+02h)
+    92   00016f cbc8            		set	1,b
+    93   000171 78              		ld	a,b
+    94   000172 32c5ff          		ld	(0ffc5h),a
+    95   000175 cd1af1          		call	0f11ah
+    96   000178 cb7f            		bit	7,a
+    97   00017a 2052            		jr	nz,ASMPC + 2 + 82		; (+52h)
+    98   00017c 3a2dff          		ld	a,(0ff2dh)
+    99   00017f feff            		cp	0ffh
+   100   000181 2805            		jr	z,ASMPC + 2 + 5		; (+05h)
+   101   000183 ddbe02          		cp	(ix+02h)
+   102   000186 2805            		jr	z,ASMPC + 2 + 5		; (+05h)
+   103   000188 cdf8f1          		call	0f1f8h
+   104   00018b 2041            		jr	nz,ASMPC + 2 + 65		; (+41h)
+   105   00018d 3a12ff          		ld	a,(0ff12h)
+   106   000190 3c              		inc	a
+   107   000191 20fa            		jr	nz,ASMPC + 2 - 6		; (-06h)
+   108   000193 f3              		di
+   109   000194 3e03            		ld	a,03h
+   110   000196 d380            		out	(80h),a
+   111   000198 3e27            		ld	a,27h
+   112   00019a d382            		out	(82h),a
+   113   00019c 3e3d            		ld	a,3dh
+   114   00019e d382            		out	(82h),a
+   115   0001a0 21a8f3          		ld	hl,0f3a8h
+   116   0001a3 2216ff          		ld	(0ff16h),hl
+   117   0001a6 3a33ff          		ld	a,(0ff33h)
+   118   0001a9 32c6ff          		ld	(0ffc6h),a
+   119   0001ac dd7e03          		ld	a,(ix+03h)
+   120   0001af d342            		out	(42h),a
+   121   0001b1 dd7e02          		ld	a,(ix+02h)
+   122   0001b4 d341            		out	(41h),a
+   123   0001b6 3ac5ff          		ld	a,(0ffc5h)
+   124   0001b9 d340            		out	(40h),a
+   125   0001bb cdb5f2          		call	0f2b5h
+   126   0001be 280e            		jr	z,ASMPC + 2 + 14		; (+0eh)
+   127   0001c0 f5              		push	af
+   128   0001c1 cd0ef3          		call	0f30eh
+   129   0001c4 c1              		pop	bc
+   130   0001c5 2006            		jr	nz,ASMPC + 2 + 6		; (+06h)
+   131   0001c7 21c6ff          		ld	hl,0ffc6h
+   132   0001ca 35              		dec	(hl)
+   133   0001cb 20df            		jr	nz,ASMPC + 2 - 33		; (-21h)
+   134   0001cd 78              		ld	a,b
+   135   0001ce dd7708          		ld	(ix+08h),a
+   136   0001d1 cd18f0          		call	0f018h
+   137   0001d4 cd3cf0          		call	0f03ch
+   138   0001d7 c9              		ret
+   139                          
+   140   0001d8 dd7e01          		ld	a,(ix+01h)
+   141   0001db cbbf            		res	7,a
+   142   0001dd fe04            		cp	04h
+   143   0001df 306b            		jr	nc,ASMPC + 2 + 107		; (+6bh)
+   144   0001e1 0600            		ld	b,00h
+   145   0001e3 4f              		ld	c,a
+   146   0001e4 212cff          		ld	hl,0ff2ch
+   147   0001e7 96              		sub	(hl)
+   148   0001e8 f5              		push	af
+   149   0001e9 50              		ld	d,b
+   150   0001ea 5e              		ld	e,(hl)
+   151   0001eb 71              		ld	(hl),c
+   152   0001ec 2120ff          		ld	hl,0ff20h
+   153   0001ef 19              		add	hl,de
+   154   0001f0 3a2dff          		ld	a,(0ff2dh)
+   155   0001f3 77              		ld	(hl),a
+   156   0001f4 1e04            		ld	e,04h
+   157   0001f6 19              		add	hl,de
+   158   0001f7 3a2fff          		ld	a,(0ff2fh)
+   159   0001fa 77              		ld	(hl),a
+   160   0001fb 2120ff          		ld	hl,0ff20h
+   161   0001fe 09              		add	hl,bc
+   162   0001ff 7e              		ld	a,(hl)
+   163   000200 322dff          		ld	(0ff2dh),a
+   164   000203 19              		add	hl,de
+   165   000204 d1              		pop	de
+   166   000205 7e              		ld	a,(hl)
+   167   000206 b7              		or	a
+   168   000207 201f            		jr	nz,ASMPC + 2 + 31		; (+1fh)
+   169   000209 2198f1          		ld	hl,0f198h
+   170   00020c 09              		add	hl,bc
+   171   00020d 7e              		ld	a,(hl)
+   172   00020e d330            		out	(30h),a
+   173   000210 f5              		push	af
+   174   000211 cd9cf1          		call	0f19ch
+   175   000214 c1              		pop	bc
+   176   000215 fede            		cp	0deh
+   177   000217 3033            		jr	nc,ASMPC + 2 + 51		; (+33h)
+   178   000219 cbf0            		set	6,b
+   179   00021b feb5            		cp	0b5h
+   180   00021d 3006            		jr	nc,ASMPC + 2 + 6		; (+06h)
+   181   00021f cbb0            		res	6,b
+   182   000221 fe99            		cp	99h
+   183   000223 3827            		jr	c,ASMPC + 2 + 39		; (+27h)
+   184   000225 78              		ld	a,b
+   185   000226 1600            		ld	d,00h
+   186   000228 cbaf            		res	5,a
+   187   00022a ddcb017e        		bit	7,(ix+01h)
+   188   00022e 2802            		jr	z,ASMPC + 2 + 2		; (+02h)
+   189   000230 cbef            		set	5,a
+   190   000232 d330            		out	(30h),a
+   191   000234 322fff          		ld	(0ff2fh),a
+   192   000237 14              		inc	d
+   193   000238 15              		dec	d
+   194   000239 c499f3          		call	nz,0f399h
+   195   00023c cd91f3          		call	0f391h
+   196   00023f cb6f            		bit	5,a
+   197   000241 c0              		ret	nz
+   198                          
+   199   000242 cd9cf1          		call	0f19ch
+   200   000245 b7              		or	a
+   201   000246 2804            		jr	z,ASMPC + 2 + 4		; (+04h)
+   202   000248 cd91f3          		call	0f391h
+   203   00024b c9              		ret
+   204                          
+   205   00024c af              		xor	a
+   206   00024d d330            		out	(30h),a
+   207   00024f 322fff          		ld	(0ff2fh),a
+   208   000252 3e80            		ld	a,80h
+   209   000254 b7              		or	a
+   210   000255 c9              		ret
+   211                          
+   212   000256 010204          		ld	bc,0402h
+   213   000259 08              		ex	af,af'
+   214   00025a af              		xor	a
+   215   00025b d356            		out	(56h),a
+   216   00025d 3c              		inc	a
+   217   00025e d354            		out	(54h),a
+   218   000260 db41            		in	a,(41h)
+   219   000262 d343            		out	(43h),a
+   220   000264 3e18            		ld	a,18h
+   221   000266 d340            		out	(40h),a
+   222   000268 cdbaf3          		call	0f3bah
+   223   00026b cd91f3          		call	0f391h
+   224   00026e 4f              		ld	c,a
+   225   00026f 0606            		ld	b,06h
+   226   000271 210000          		ld	hl,0000h
+   227   000274 22c7ff          		ld	(0ffc7h),hl
+   228   000277 ed5bc7ff        		ld	de,(0ffc7h)
+   229   00027b cde3f1          		call	0f1e3h
+   230   00027e 380d            		jr	c,ASMPC + 2 + 13		; (+0dh)
+   231   000280 cde3f1          		call	0f1e3h
+   232   000283 3808            		jr	c,ASMPC + 2 + 8		; (+08h)
+   233   000285 10f0            		djnz	ASMPC + 2 - 16		; (-10h)
+   234   000287 2ac7ff          		ld	hl,(0ffc7h)
+   235   00028a b7              		or	a
+   236   00028b ed52            		sbc	hl,de
+   237   00028d cdcbf3          		call	0f3cbh
+   238   000290 af              		xor	a
+   239   000291 d354            		out	(54h),a
+   240   000293 3c              		inc	a
+   241   000294 d356            		out	(56h),a
+   242   000296 7d              		ld	a,l
+   243   000297 24              		inc	h
+   244   000298 25              		dec	h
+   245   000299 2802            		jr	z,ASMPC + 2 + 2		; (+02h)
+   246   00029b 3eff            		ld	a,0ffh
+   247   00029d 3230ff          		ld	(0ff30h),a
+   248   0002a0 c9              		ret
+   249                          
+   250   0002a1 cd91f3          		call	0f391h
+   251   0002a4 a9              		xor	c
+   252   0002a5 e602            		and	02h
+   253   0002a7 2009            		jr	nz,ASMPC + 2 + 9		; (+09h)
+   254   0002a9 3ac8ff          		ld	a,(0ffc8h)
+   255   0002ac fe08            		cp	08h
+   256   0002ae 38f1            		jr	c,ASMPC + 2 - 15		; (-0fh)
+   257   0002b0 37              		scf
+   258   0002b1 c9              		ret
+   259                          
+   260   0002b2 79              		ld	a,c
+   261   0002b3 2f              		cpl
+   262   0002b4 4f              		ld	c,a
+   263   0002b5 c9              		ret
+   264                          
+   265   0002b6 3a2dff          		ld	a,(0ff2dh)
+   266   0002b9 feff            		cp	0ffh
+   267   0002bb 2005            		jr	nz,ASMPC + 2 + 5		; (+05h)
+   268   0002bd cd37f2          		call	0f237h
+   269   0002c0 202a            		jr	nz,ASMPC + 2 + 42		; (+2ah)
+   270   0002c2 0601            		ld	b,01h
+   271   0002c4 cd57f2          		call	0f257h
+   272   0002c7 c8              		ret	z
+   273                          
+   274   0002c8 3005            		jr	nc,ASMPC + 2 + 5		; (+05h)
+   275   0002ca cd37f2          		call	0f237h
+   276   0002cd 201d            		jr	nz,ASMPC + 2 + 29		; (+1dh)
+   277   0002cf 0602            		ld	b,02h
+   278   0002d1 cd57f2          		call	0f257h
+   279   0002d4 c8              		ret	z
+   280                          
+   281   0002d5 3815            		jr	c,ASMPC + 2 + 21		; (+15h)
+   282   0002d7 216400          		ld	hl,0064h
+   283   0002da cd9ef3          		call	0f39eh
+   284   0002dd 2128ff          		ld	hl,0ff28h
+   285   0002e0 3a2cff          		ld	a,(0ff2ch)
+   286   0002e3 85              		add	a,l
+   287   0002e4 6f              		ld	l,a
+   288   0002e5 34              		inc	(hl)
+   289   0002e6 7e              		ld	a,(hl)
+   290   0002e7 e603            		and	03h
+   291   0002e9 20e4            		jr	nz,ASMPC + 2 - 28		; (-1ch)
+   292   0002eb 35              		dec	(hl)
+   293   0002ec 3eff            		ld	a,0ffh
+   294   0002ee 322dff          		ld	(0ff2dh),a
+   295   0002f1 3e10            		ld	a,10h
+   296   0002f3 b7              		or	a
+   297   0002f4 c9              		ret
+   298                          
+   299   0002f5 3a2fff          		ld	a,(0ff2fh)
+   300   0002f8 cbe7            		set	4,a
+   301   0002fa d330            		out	(30h),a
+   302   0002fc 060f            		ld	b,0fh
+   303   0002fe 10fe            		djnz	ASMPC + 2 - 2		; (-02h)
+   304   000300 cba7            		res	4,a
+   305   000302 d330            		out	(30h),a
+   306   000304 0600            		ld	b,00h
+   307   000306 10fe            		djnz	ASMPC + 2 - 2		; (-02h)
+   308   000308 cd91f3          		call	0f391h
+   309   00030b 3e0b            		ld	a,0bh
+   310   00030d cd6bf3          		call	0f36bh
+   311   000310 ee04            		xor	04h
+   312   000312 e684            		and	84h
+   313   000314 c9              		ret
+   314                          
+   315   000315 c5              		push	bc
+   316   000316 3a2dff          		ld	a,(0ff2dh)
+   317   000319 47              		ld	b,a
+   318   00031a dd4e02          		ld	c,(ix+02h)
+   319   00031d cd75f2          		call	0f275h
+   320   000320 cd95f2          		call	0f295h
+   321   000323 c1              		pop	bc
+   322   000324 37              		scf
+   323   000325 c0              		ret	nz
+   324                          
+   325   000326 db42            		in	a,(42h)
+   326   000328 322dff          		ld	(0ff2dh),a
+   327   00032b dd9602          		sub	(ix+02h)
+   328   00032e c8              		ret	z
+   329                          
+   330   00032f 10e4            		djnz	ASMPC + 2 - 28		; (-1ch)
+   331   000331 b7              		or	a
+   332   000332 c9              		ret
+   333                          
+   334   000333 78              		ld	a,b
+   335   000334 d341            		out	(41h),a
+   336   000336 79              		ld	a,c
+   337   000337 d343            		out	(43h),a
+   338   000339 2128ff          		ld	hl,0ff28h
+   339   00033c 3a2cff          		ld	a,(0ff2ch)
+   340   00033f 85              		add	a,l
+   341   000340 6f              		ld	l,a
+   342   000341 7e              		ld	a,(hl)
+   343   000342 e603            		and	03h
+   344   000344 f618            		or	18h
+   345   000346 cd6bf3          		call	0f36bh
+   346   000349 7e              		ld	a,(hl)
+   347   00034a e6fc            		and	0fch
+   348   00034c 2600            		ld	h,00h
+   349   00034e 6f              		ld	l,a
+   350   00034f cd9ef3          		call	0f39eh
+   351   000352 c9              		ret
+   352                          
+   353   000353 3ec0            		ld	a,0c0h
+   354   000355 cd62f3          		call	0f362h
+   355   000358 e698            		and	98h
+   356   00035a c8              		ret	z
+   357                          
+   358   00035b 3a2fff          		ld	a,(0ff2fh)
+   359   00035e ee80            		xor	80h
+   360   000360 322fff          		ld	(0ff2fh),a
+   361   000363 d330            		out	(30h),a
+   362   000365 213200          		ld	hl,0032h
+   363   000368 cd9ef3          		call	0f39eh
+   364   00036b 3ec0            		ld	a,0c0h
+   365   00036d cd62f3          		call	0f362h
+   366   000370 e698            		and	98h
+   367   000372 c9              		ret
+   368                          
+   369   000373 2a6600          		ld	hl,(0066h)
+   370   000376 e5              		push	hl
+   371   000377 2a6800          		ld	hl,(0068h)
+   372   00037a e5              		push	hl
+   373   00037b 21eda2          		ld	hl,0a2edh
+   374   00037e cb6f            		bit	5,a
+   375   000380 2801            		jr	z,ASMPC + 2 + 1		; (+01h)
+   376   000382 24              		inc	h
+   377   000383 226600          		ld	(0066h),hl
+   378   000386 216800          		ld	hl,0068h
+   379   000389 36c9            		ld	(hl),0c9h
+   380   00038b f3              		di
+   381   00038c 3ec7            		ld	a,0c7h
+   382   00038e d383            		out	(83h),a
+   383   000390 af              		xor	a
+   384   000391 d383            		out	(83h),a
+   385   000393 fb              		ei
+   386   000394 dd6e04          		ld	l,(ix+04h)
+   387   000397 dd6605          		ld	h,(ix+05h)
+   388   00039a dd4606          		ld	b,(ix+06h)
+   389   00039d 0e43            		ld	c,43h
+   390   00039f dd7e07          		ld	a,(ix+07h)
+   391   0003a2 cb3f            		srl	a
+   392   0003a4 280d            		jr	z,ASMPC + 2 + 13		; (+0dh)
+   393   0003a6 cb3f            		srl	a
+   394   0003a8 2806            		jr	z,ASMPC + 2 + 6		; (+06h)
+   395   0003aa 76              		halt
+   396   0003ab 20fd            		jr	nz,ASMPC + 2 - 3		; (-03h)
+   397   0003ad 76              		halt
+   398   0003ae 20fd            		jr	nz,ASMPC + 2 - 3		; (-03h)
+   399   0003b0 76              		halt
+   400   0003b1 20fd            		jr	nz,ASMPC + 2 - 3		; (-03h)
+   401   0003b3 76              		halt
+   402   0003b4 20fd            		jr	nz,ASMPC + 2 - 3		; (-03h)
+   403   0003b6 db40            		in	a,(40h)
+   404   0003b8 cb47            		bit	0,a
+   405   0003ba 20fa            		jr	nz,ASMPC + 2 - 6		; (-06h)
+   406   0003bc 47              		ld	b,a
+   407   0003bd cdcbf3          		call	0f3cbh
+   408   0003c0 78              		ld	a,b
+   409   0003c1 e1              		pop	hl
+   410   0003c2 226800          		ld	(0068h),hl
+   411   0003c5 e1              		pop	hl
+   412   0003c6 226600          		ld	(0066h),hl
+   413   0003c9 e6fd            		and	0fdh
+   414   0003cb c9              		ret
+   415                          
+   416   0003cc 47              		ld	b,a
+   417   0003cd e6e7            		and	0e7h
+   418   0003cf 2808            		jr	z,ASMPC + 2 + 8		; (+08h)
+   419   0003d1 f5              		push	af
+   420   0003d2 cd91f3          		call	0f391h
+   421   0003d5 f1              		pop	af
+   422   0003d6 e6e1            		and	0e1h
+   423   0003d8 c9              		ret
+   424                          
+   425   0003d9 cb60            		bit	4,b
+   426   0003db 2023            		jr	nz,ASMPC + 2 + 35		; (+23h)
+   427   0003dd 3a33ff          		ld	a,(0ff33h)
+   428   0003e0 21c6ff          		ld	hl,0ffc6h
+   429   0003e3 96              		sub	(hl)
+   430   0003e4 c8              		ret	z
+   431                          
+   432   0003e5 3a2dff          		ld	a,(0ff2dh)
+   433   0003e8 47              		ld	b,a
+   434   0003e9 b7              		or	a
+   435   0003ea 2004            		jr	nz,ASMPC + 2 + 4		; (+04h)
+   436   0003ec 0e01            		ld	c,01h
+   437   0003ee 1802            		jr	ASMPC + 2 + 2		; (+02h)
+   438   0003f0 3d              		dec	a
+   439   0003f1 4f              		ld	c,a
+   440   0003f2 c5              		push	bc
+   441   0003f3 cd75f2          		call	0f275h
+   442   0003f6 d1              		pop	de
+   443   0003f7 43              		ld	b,e
+   444   0003f8 4a              		ld	c,d
+   445   0003f9 cd75f2          		call	0f275h
+   446   0003fc cd95f2          		call	0f295h
+   447   0003ff c9              		ret
+   448                          
+   449   000400 cd95f2          		call	0f295h
+   450   000403 2012            		jr	nz,ASMPC + 2 + 18		; (+12h)
+   451   000405 db42            		in	a,(42h)
+   452   000407 ddbe02          		cp	(ix+02h)
+   453   00040a 200d            		jr	nz,ASMPC + 2 + 13		; (+0dh)
+   454   00040c 3a33ff          		ld	a,(0ff33h)
+   455   00040f 21c6ff          		ld	hl,0ffc6h
+   456   000412 96              		sub	(hl)
+   457   000413 c8              		ret	z
+   458                          
+   459   000414 3e10            		ld	a,10h
+   460   000416 c9              		ret
+   461                          
+   462   000417 3eff            		ld	a,0ffh
+   463   000419 322dff          		ld	(0ff2dh),a
+   464   00041c cdf8f1          		call	0f1f8h
+   465   00041f c9              		ret
+   466                          
+   467   000420 cd89f3          		call	0f389h
+   468   000423 c5              		push	bc
+   469   000424 016a18          		ld	bc,186ah
+   470   000427 1807            		jr	ASMPC + 2 + 7		; (+07h)
+   471   000429 cd89f3          		call	0f389h
+   472   00042c c5              		push	bc
+   473   00042d 017c92          		ld	bc,927ch
+   474   000430 db40            		in	a,(40h)
+   475   000432 cb47            		bit	0,a
+   476   000434 280a            		jr	z,ASMPC + 2 + 10		; (+0ah)
+   477   000436 cd8bf3          		call	0f38bh
+   478   000439 0b              		dec	bc
+   479   00043a 78              		ld	a,b
+   480   00043b b1              		or	c
+   481   00043c 20f2            		jr	nz,ASMPC + 2 - 14		; (-0eh)
+   482   00043e 3e10            		ld	a,10h
+   483   000440 47              		ld	b,a
+   484   000441 cd91f3          		call	0f391h
+   485   000444 78              		ld	a,b
+   486   000445 c1              		pop	bc
+   487   000446 c9              		ret
+   488                          
+   489   000447 d340            		out	(40h),a
+   490   000449 3e0e            		ld	a,0eh
+   491   00044b 3d              		dec	a
+   492   00044c 20fd            		jr	nz,ASMPC + 2 - 3		; (-03h)
+   493   00044e c9              		ret
+   494                          
+   495   00044f 3ed0            		ld	a,0d0h
+   496   000451 cd89f3          		call	0f389h
+   497   000454 db40            		in	a,(40h)
+   498   000456 c9              		ret
+   499                          
+   500   000457 2a32ff          		ld	hl,(0ff32h)
+   501   00045a 2600            		ld	h,00h
+   502   00045c af              		xor	a
+   503   00045d 3d              		dec	a
+   504   00045e 20fd            		jr	nz,ASMPC + 2 - 3		; (-03h)
+   505   000460 2b              		dec	hl
+   506   000461 7c              		ld	a,h
+   507   000462 b5              		or	l
+   508   000463 20f7            		jr	nz,ASMPC + 2 - 9		; (-09h)
+   509   000465 c9              		ret
+   510                          
+   511   000466 3ed0            		ld	a,0d0h
+   512   000468 d340            		out	(40h),a
+   513   00046a 3e01            		ld	a,01h
+   514   00046c d383            		out	(83h),a
+   515   00046e 2103f3          		ld	hl,0f303h
+   516   000471 e3              		ex	(sp),hl
+   517   000472 3e10            		ld	a,10h
+   518   000474 b7              		or	a
+   519   000475 fb              		ei
+   520   000476 ed4d            		reti
+   521                          
+   522   000478 f3              		di
+   523   000479 3e87            		ld	a,87h
+   524   00047b d383            		out	(83h),a
+   525   00047d 3efa            		ld	a,0fah
+   526   00047f d383            		out	(83h),a
+   527   000481 21d2f3          		ld	hl,0f3d2h
+   528   000484 2216ff          		ld	(0ff16h),hl
+   529   000487 fb              		ei
+   530   000488 c9              		ret
+   531                          
+   532   000489 f3              		di
+   533   00048a 3e01            		ld	a,01h
+   534   00048c d383            		out	(83h),a
+   535   00048e fb              		ei
+   536   00048f c9              		ret
+   537                          
+   538   000490 e5              		push	hl
+   539   000491 fb              		ei
+   540   000492 2ac7ff          		ld	hl,(0ffc7h)
+   541   000495 23              		inc	hl
+   542   000496 22c7ff          		ld	(0ffc7h),hl
+   543   000499 e1              		pop	hl
+   544   00049a ed4d            		reti
+   545                          
+   546   00049c 3e01            		ld	a,01h
+   547   00049e d352            		out	(52h),a
+   548   0004a0 cdfcf5          		call	0f5fch
+   549   0004a3 cdc9f4          		call	0f4c9h
+   550   0004a6 0d              		dec	c
+   551   0004a7 0a              		ld	a,(bc)
+   552   0004a8 53              		ld	d,e
+   553   0004a9 41              		ld	b,c
+   554   0004aa 4c              		ld	c,h
+   555   0004ab 4c              		ld	c,h
+   556   0004ac 59              		ld	e,c
+   557   0004ad 310021          		ld	sp,2100h
+   558   0004b0 f1              		pop	af
+   559   0004b1 f3              		di
+   560   0004b2 e5              		push	hl
+   561   0004b3 cdc9f4          		call	0f4c9h
+   562   0004b6 0d              		dec	c
+   563   0004b7 0a              		ld	a,(bc)
+   564   0004b8 23              		inc	hl
+   565   0004b9 2000            		jr	nz,ASMPC + 2 + 0		; (+00h)
+   566   0004bb cdb2f4          		call	0f4b2h
+   567   0004be fe20            		cp	20h
+   568   0004c0 d8              		ret	c
+   569                          
+   570   0004c1 4f              		ld	c,a
+   571   0004c2 af              		xor	a
+   572   0004c3 67              		ld	h,a
+   573   0004c4 6f              		ld	l,a
+   574   0004c5 29              		add	hl,hl
+   575   0004c6 29              		add	hl,hl
+   576   0004c7 29              		add	hl,hl
+   577   0004c8 29              		add	hl,hl
+   578   0004c9 b5              		or	l
+   579   0004ca 6f              		ld	l,a
+   580   0004cb cdb2f4          		call	0f4b2h
+   581   0004ce fe0d            		cp	0dh
+   582   0004d0 280c            		jr	z,ASMPC + 2 + 12		; (+0ch)
+   583   0004d2 cd83f4          		call	0f483h
+   584   0004d5 30ee            		jr	nc,ASMPC + 2 - 18		; (-12h)
+   585   0004d7 cdc9f4          		call	0f4c9h
+   586   0004da 203f            		jr	nz,ASMPC + 2 + 63		; (+3fh)
+   587   0004dc 00              		nop
+   588   0004dd c9              		ret
+   589                          
+   590   0004de cdd5f4          		call	0f4d5h
+   591   0004e1 79              		ld	a,c
+   592   0004e2 fe47            		cp	47h
+   593   0004e4 2836            		jr	z,ASMPC + 2 + 54		; (+36h)
+   594   0004e6 fe42            		cp	42h
+   595   0004e8 2833            		jr	z,ASMPC + 2 + 51		; (+33h)
+   596   0004ea fe4d            		cp	4dh
+   597   0004ec 20e9            		jr	nz,ASMPC + 2 - 23		; (-17h)
+   598   0004ee cd93f4          		call	0f493h
+   599   0004f1 7e              		ld	a,(hl)
+   600   0004f2 cd98f4          		call	0f498h
+   601   0004f5 cdb2f4          		call	0f4b2h
+   602   0004f8 fe0d            		cp	0dh
+   603   0004fa 2818            		jr	z,ASMPC + 2 + 24		; (+18h)
+   604   0004fc fe2d            		cp	2dh
+   605   0004fe 2816            		jr	z,ASMPC + 2 + 22		; (+16h)
+   606   000500 cd83f4          		call	0f483h
+   607   000503 3f              		ccf
+   608   000504 d0              		ret	nc
+   609                          
+   610   000505 07              		rlca
+   611   000506 07              		rlca
+   612   000507 07              		rlca
+   613   000508 07              		rlca
+   614   000509 4f              		ld	c,a
+   615   00050a cdb2f4          		call	0f4b2h
+   616   00050d cd83f4          		call	0f483h
+   617   000510 3f              		ccf
+   618   000511 d0              		ret	nc
+   619                          
+   620   000512 b1              		or	c
+   621   000513 77              		ld	(hl),a
+   622   000514 23              		inc	hl
+   623   000515 23              		inc	hl
+   624   000516 2b              		dec	hl
+   625   000517 cdd5f4          		call	0f4d5h
+   626   00051a 18d2            		jr	ASMPC + 2 - 46		; (-2eh)
+   627   00051c e9              		jp	(hl)
+   628   00051d dd217af4        		ld	ix,0f47ah
+   629   000521 cd22f0          		call	0f022h
+   630   000524 dd7e08          		ld	a,(ix+08h)
+   631   000527 b7              		or	a
+   632   000528 cc8000          		call	z,0080h
+   633   00052b f5              		push	af
+   634   00052c cdc9f4          		call	0f4c9h
+   635   00052f 2045            		jr	nz,ASMPC + 2 + 69		; (+45h)
+   636   000531 52              		ld	d,d
+   637   000532 52              		ld	d,d
+   638   000533 2000            		jr	nz,ASMPC + 2 + 0		; (+00h)
+   639   000535 f1              		pop	af
+   640   000536 1825            		jr	ASMPC + 2 + 37		; (+25h)
+   641   000538 010000          		ld	bc,0000h
+   642   00053b 018000          		ld	bc,0080h
+   643   00053e 80              		add	a,b
+   644   00053f 00              		nop
+   645   000540 00              		nop
+   646   000541 d630            		sub	30h
+   647   000543 d8              		ret	c
+   648                          
+   649   000544 fe0a            		cp	0ah
+   650   000546 3f              		ccf
+   651   000547 d0              		ret	nc
+   652                          
+   653   000548 d607            		sub	07h
+   654   00054a fe0a            		cp	0ah
+   655   00054c d8              		ret	c
+   656                          
+   657   00054d fe10            		cp	10h
+   658   00054f 3f              		ccf
+   659   000550 c9              		ret
+   660                          
+   661   000551 7c              		ld	a,h
+   662   000552 cd9ff4          		call	0f49fh
+   663   000555 7d              		ld	a,l
+   664   000556 cd9ff4          		call	0f49fh
+   665   000559 3e20            		ld	a,20h
+   666   00055b 181f            		jr	ASMPC + 2 + 31		; (+1fh)
+   667   00055d f5              		push	af
+   668   00055e 1f              		rra
+   669   00055f 1f              		rra
+   670   000560 1f              		rra
+   671   000561 1f              		rra
+   672   000562 cda8f4          		call	0f4a8h
+   673   000565 f1              		pop	af
+   674   000566 e60f            		and	0fh
+   675   000568 c690            		add	a,90h
+   676   00056a 27              		daa
+   677   00056b ce40            		adc	a,40h
+   678   00056d 27              		daa
+   679   00056e 180c            		jr	ASMPC + 2 + 12		; (+0ch)
+   680   000570 e5              		push	hl
+   681   000571 c5              		push	bc
+   682   000572 cd09f0          		call	0f009h
+   683   000575 c1              		pop	bc
+   684   000576 e1              		pop	hl
+   685   000577 cbbf            		res	7,a
+   686   000579 fe20            		cp	20h
+   687   00057b d8              		ret	c
+   688                          
+   689   00057c e5              		push	hl
+   690   00057d c5              		push	bc
+   691   00057e f5              		push	af
+   692   00057f 4f              		ld	c,a
+   693   000580 cd0cf0          		call	0f00ch
+   694   000583 f1              		pop	af
+   695   000584 c1              		pop	bc
+   696   000585 e1              		pop	hl
+   697   000586 c9              		ret
+   698                          
+   699   000587 e3              		ex	(sp),hl
+   700   000588 7e              		ld	a,(hl)
+   701   000589 cdbef4          		call	0f4beh
+   702   00058c 7e              		ld	a,(hl)
+   703   00058d 23              		inc	hl
+   704   00058e b7              		or	a
+   705   00058f 20f7            		jr	nz,ASMPC + 2 - 9		; (-09h)
+   706   000591 e3              		ex	(sp),hl
+   707   000592 c9              		ret
+   708                          
+   709   000593 cdc9f4          		call	0f4c9h
+   710   000596 0d              		dec	c
+   711   000597 0a              		ld	a,(bc)
+   712   000598 00              		nop
+   713   000599 c9              		ret
+   714                          
+   715   00059a 79              		ld	a,c
+   716   00059b d320            		out	(20h),a
+   717   00059d e3              		ex	(sp),hl
+   718   00059e e3              		ex	(sp),hl
+   719   00059f 3e19            		ld	a,19h
+   720   0005a1 d353            		out	(53h),a
+   721   0005a3 3d              		dec	a
+   722   0005a4 20fd            		jr	nz,ASMPC + 2 - 3		; (-03h)
+   723   0005a6 d353            		out	(53h),a
+   724   0005a8 c9              		ret
+   725                          
+   726   0005a9 2a47ff          		ld	hl,(0ff47h)
+   727   0005ac db20            		in	a,(20h)
+   728   0005ae a5              		and	l
+   729   0005af ac              		xor	h
+   730   0005b0 c9              		ret
+   731                          
+   732   0005b1 95              		sub	l
+   733   0005b2 00              		nop
+   734   0005b3 00              		nop
+   735   0005b4 00              		nop
+   736   0005b5 00              		nop
+   737   0005b6 00              		nop
+   738   0005b7 00              		nop
+   739   0005b8 00              		nop
+   740   0005b9 00              		nop
+   741   0005ba 00              		nop
+   742   0005bb 00              		nop
+   743   0005bc 00              		nop
+   744   0005bd 00              		nop
+   745   0005be f5              		push	af
+   746   0005bf 3e87            		ld	a,87h
+   747   0005c1 d380            		out	(80h),a
+   748   0005c3 3e1a            		ld	a,1ah
+   749   0005c5 d380            		out	(80h),a
+   750   0005c7 3e17            		ld	a,17h
+   751   0005c9 3210ff          		ld	(0ff10h),a
+   752   0005cc 3e7f            		ld	a,7fh
+   753   0005ce 321cf5          		ld	(0f51ch),a
+   754   0005d1 f1              		pop	af
+   755   0005d2 fb              		ei
+   756   0005d3 ed4d            		reti
+   757                          
+   758   0005d5 f5              		push	af
+   759   0005d6 db70            		in	a,(70h)
+   760   0005d8 17              		rla
+   761   0005d9 3e00            		ld	a,00h
+   762   0005db 1f              		rra
+   763   0005dc 38f0            		jr	c,ASMPC + 2 - 16		; (-10h)
+   764   0005de 3200ff          		ld	(0ff00h),a
+   765   0005e1 3e2c            		ld	a,2ch
+   766   0005e3 3210ff          		ld	(0ff10h),a
+   767   0005e6 f1              		pop	af
+   768   0005e7 fb              		ei
+   769   0005e8 ed4d            		reti
+   770                          
+   771   0005ea f5              		push	af
+   772   0005eb 3ec7            		ld	a,0c7h
+   773   0005ed d380            		out	(80h),a
+   774   0005ef 3e01            		ld	a,01h
+   775   0005f1 d380            		out	(80h),a
+   776   0005f3 3a21f5          		ld	a,(0f521h)
+   777   0005f6 3c              		inc	a
+   778   0005f7 e60f            		and	0fh
+   779   0005f9 3221f5          		ld	(0f521h),a
+   780   0005fc 3e00            		ld	a,00h
+   781   0005fe 3210ff          		ld	(0ff10h),a
+   782   000601 f1              		pop	af
+   783   000602 fb              		ei
+   784   000603 ed4d            		reti
+   785                          
+   786   000605 f5              		push	af
+   787   000606 af              		xor	a
+   788   000607 d350            		out	(50h),a
+   789   000609 3e54            		ld	a,54h
+   790   00060b 3212ff          		ld	(0ff12h),a
+   791   00060e f1              		pop	af
+   792   00060f fb              		ei
+   793   000610 ed4d            		reti
+   794                          
+   795   000612 f5              		push	af
+   796   000613 3e00            		ld	a,00h
+   797   000615 d350            		out	(50h),a
+   798   000617 1f              		rra
+   799   000618 3268f5          		ld	(0f568h),a
+   800   00061b 3e66            		ld	a,66h
+   801   00061d 3212ff          		ld	(0ff12h),a
+   802   000620 f1              		pop	af
+   803   000621 fb              		ei
+   804   000622 ed4d            		reti
+   805                          
+   806   000624 f5              		push	af
+   807   000625 3e00            		ld	a,00h
+   808   000627 d350            		out	(50h),a
+   809   000629 1f              		rra
+   810   00062a 327af5          		ld	(0f57ah),a
+   811   00062d 3e78            		ld	a,78h
+   812   00062f 3212ff          		ld	(0ff12h),a
+   813   000632 f1              		pop	af
+   814   000633 fb              		ei
+   815   000634 ed4d            		reti
+   816                          
+   817   000636 f5              		push	af
+   818   000637 3e00            		ld	a,00h
+   819   000639 d350            		out	(50h),a
+   820   00063b 1f              		rra
+   821   00063c 328cf5          		ld	(0f58ch),a
+   822   00063f 3e8a            		ld	a,8ah
+   823   000641 3212ff          		ld	(0ff12h),a
+   824   000644 f1              		pop	af
+   825   000645 fb              		ei
+   826   000646 ed4d            		reti
+   827                          
+   828   000648 f5              		push	af
+   829   000649 3e00            		ld	a,00h
+   830   00064b d350            		out	(50h),a
+   831   00064d 1f              		rra
+   832   00064e 329ef5          		ld	(0f59eh),a
+   833   000651 3e9c            		ld	a,9ch
+   834   000653 3212ff          		ld	(0ff12h),a
+   835   000656 f1              		pop	af
+   836   000657 fb              		ei
+   837   000658 ed4d            		reti
+   838                          
+   839   00065a f5              		push	af
+   840   00065b 3e00            		ld	a,00h
+   841   00065d d350            		out	(50h),a
+   842   00065f 1f              		rra
+   843   000660 32b0f5          		ld	(0f5b0h),a
+   844   000663 3eae            		ld	a,0aeh
+   845   000665 3212ff          		ld	(0ff12h),a
+   846   000668 f1              		pop	af
+   847   000669 fb              		ei
+   848   00066a ed4d            		reti
+   849                          
+   850   00066c f5              		push	af
+   851   00066d 3e00            		ld	a,00h
+   852   00066f d350            		out	(50h),a
+   853   000671 1f              		rra
+   854   000672 32c2f5          		ld	(0f5c2h),a
+   855   000675 3ec0            		ld	a,0c0h
+   856   000677 3212ff          		ld	(0ff12h),a
+   857   00067a f1              		pop	af
+   858   00067b fb              		ei
+   859   00067c ed4d            		reti
+   860                          
+   861   00067e f5              		push	af
+   862   00067f 3e00            		ld	a,00h
+   863   000681 d350            		out	(50h),a
+   864   000683 1f              		rra
+   865   000684 32d4f5          		ld	(0f5d4h),a
+   866   000687 3ed2            		ld	a,0d2h
+   867   000689 3212ff          		ld	(0ff12h),a
+   868   00068c f1              		pop	af
+   869   00068d fb              		ei
+   870   00068e ed4d            		reti
+   871                          
+   872   000690 f5              		push	af
+   873   000691 3e00            		ld	a,00h
+   874   000693 d350            		out	(50h),a
+   875   000695 3ee0            		ld	a,0e0h
+   876   000697 3212ff          		ld	(0ff12h),a
+   877   00069a f1              		pop	af
+   878   00069b fb              		ei
+   879   00069c ed4d            		reti
+   880                          
+   881   00069e f5              		push	af
+   882   00069f 3e01            		ld	a,01h
+   883   0006a1 d350            		out	(50h),a
+   884   0006a3 3eee            		ld	a,0eeh
+   885   0006a5 3212ff          		ld	(0ff12h),a
+   886   0006a8 f1              		pop	af
+   887   0006a9 fb              		ei
+   888   0006aa ed4d            		reti
+   889                          
+   890   0006ac f5              		push	af
+   891   0006ad 3e01            		ld	a,01h
+   892   0006af d381            		out	(81h),a
+   893   0006b1 3eff            		ld	a,0ffh
+   894   0006b3 3212ff          		ld	(0ff12h),a
+   895   0006b6 f1              		pop	af
+   896   0006b7 fb              		ei
+   897   0006b8 ed4d            		reti
+   898                          
+   899   0006ba f3              		di
+   900   0006bb 21eef5          		ld	hl,0f5eeh
+   901   0006be 2212ff          		ld	(0ff12h),hl
+   902   0006c1 3e07            		ld	a,07h
+   903   0006c3 d381            		out	(81h),a
+   904   0006c5 3a06f5          		ld	a,(0f506h)
+   905   0006c8 d381            		out	(81h),a
+   906   0006ca 2100ff          		ld	hl,0ff00h
+   907   0006cd 2221f5          		ld	(0f521h),hl
+   908   0006d0 2233f6          		ld	(0f633h),hl
+   909   0006d3 f3              		di
+   910   0006d4 3e01            		ld	a,01h
+   911   0006d6 d357            		out	(57h),a
+   912   0006d8 067e            		ld	b,7eh
+   913   0006da db70            		in	a,(70h)
+   914   0006dc 17              		rla
+   915   0006dd 30f9            		jr	nc,ASMPC + 2 - 7		; (-07h)
+   916   0006df 10f9            		djnz	ASMPC + 2 - 7		; (-07h)
+   917   0006e1 3ec7            		ld	a,0c7h
+   918   0006e3 d380            		out	(80h),a
+   919   0006e5 3e01            		ld	a,01h
+   920   0006e7 d380            		out	(80h),a
+   921   0006e9 2100f5          		ld	hl,0f500h
+   922   0006ec 2210ff          		ld	(0ff10h),hl
+   923   0006ef fb              		ei
+   924   0006f0 c9              		ret
+   925                          
+   926   0006f1 00              		nop
+   927   0006f2 ff              		rst	38h
+   928   0006f3 2133f6          		ld	hl,0f633h
+   929   0006f6 3a21f5          		ld	a,(0f521h)
+   930   0006f9 96              		sub	(hl)
+   931   0006fa c8              		ret	z
+   932                          
+   933   0006fb 3eff            		ld	a,0ffh
+   934   0006fd c9              		ret
+   935                          
+   936   0006fe cd35f6          		call	0f635h
+   937   000701 28fb            		jr	z,ASMPC + 2 - 5		; (-05h)
+   938   000703 2a33f6          		ld	hl,(0f633h)
+   939   000706 7e              		ld	a,(hl)
+   940   000707 2c              		inc	l
+   941   000708 cba5            		res	4,l
+   942   00070a 2233f6          		ld	(0f633h),hl
+   943   00070d c9              		ret
+   944                          
+   945   00070e 3a12ff          		ld	a,(0ff12h)
+   946   000711 feee            		cp	0eeh
+   947   000713 38f9            		jr	c,ASMPC + 2 - 7		; (-07h)
+   948   000715 79              		ld	a,c
+   949   000716 e67f            		and	7fh
+   950   000718 e25ff6          		jp	po,0f65fh
+   951   00071b f680            		or	80h
+   952   00071d 3256f5          		ld	(0f556h),a
+   953   000720 3e47            		ld	a,47h
+   954   000722 3212ff          		ld	(0ff12h),a
+   955   000725 3e81            		ld	a,81h
+   956   000727 d381            		out	(81h),a
+   957   000729 c9              		ret
+   958                          
+   959   00072a e5              		push	hl
+   960   00072b d5              		push	de
+   961   00072c 2101c3          		ld	hl,0c301h
+   962   00072f 73              		ld	(hl),e
+   963   000730 1600            		ld	d,00h
+   964   000732 cd84f6          		call	0f684h
+   965   000735 d1              		pop	de
+   966   000736 e1              		pop	hl
+   967   000737 1e00            		ld	e,00h
+   968   000739 cd84f6          		call	0f684h
+   969   00073c 2101c3          		ld	hl,0c301h
+   970   00073f 73              		ld	(hl),e
+   971   000740 1600            		ld	d,00h
+   972   000742 f3              		di
+   973   000743 0119f7          		ld	bc,0f719h
+   974   000746 ed4312ff        		ld	(0ff12h),bc
+   975   00074a 0608            		ld	b,08h
+   976   00074c 3e87            		ld	a,87h
+   977   00074e d381            		out	(81h),a
+   978   000750 3e0d            		ld	a,0dh
+   979   000752 d381            		out	(81h),a
+   980   000754 fb              		ei
+   981   000755 18fe            		jr	ASMPC + 2 - 2		; (-02h)
+   982   000757 08              		ex	af,af'
+   983   000758 d9              		exx
+   984   000759 3eff            		ld	a,0ffh
+   985   00075b 3255ff          		ld	(0ff55h),a
+   986   00075e d357            		out	(57h),a
+   987   000760 21fbc2          		ld	hl,0c2fbh
+   988   000763 cdd9f6          		call	0f6d9h
+   989   000766 300a            		jr	nc,ASMPC + 2 + 10		; (+0ah)
+   990   000768 2b              		dec	hl
+   991   000769 7e              		ld	a,(hl)
+   992   00076a b9              		cp	c
+   993   00076b 2005            		jr	nz,ASMPC + 2 + 5		; (+05h)
+   994   00076d 3e01            		ld	a,01h
+   995   00076f 3255ff          		ld	(0ff55h),a
+   996   000772 08              		ex	af,af'
+   997   000773 d9              		exx
+   998   000774 fb              		ei
+   999   000775 ed4d            		reti
+  1000                          
+  1001   000777 f3              		di
+  1002   000778 2100c1          		ld	hl,0c100h
+  1003   00077b cdd9f6          		call	0f6d9h
+  1004   00077e fb              		ei
+  1005   00077f 380d            		jr	c,ASMPC + 2 + 13		; (+0dh)
+  1006   000781 2b              		dec	hl
+  1007   000782 7e              		ld	a,(hl)
+  1008   000783 b9              		cp	c
+  1009   000784 2008            		jr	nz,ASMPC + 2 + 8		; (+08h)
+  1010   000786 1100c1          		ld	de,0c100h
+  1011   000789 b7              		or	a
+  1012   00078a ed52            		sbc	hl,de
+  1013   00078c af              		xor	a
+  1014   00078d c9              		ret
+  1015                          
+  1016   00078e 3e4e            		ld	a,4eh
+  1017   000790 cd56fc          		call	0fc56h
+  1018   000793 3eff            		ld	a,0ffh
+  1019   000795 b7              		or	a
+  1020   000796 c9              		ret
+  1021                          
+  1022   000797 11aa0a          		ld	de,0aaah
+  1023   00079a 010000          		ld	bc,0000h
+  1024   00079d 1823            		jr	ASMPC + 2 + 35		; (+23h)
+  1025   00079f 79              		ld	a,c
+  1026   0007a0 80              		add	a,b
+  1027   0007a1 ce00            		adc	a,00h
+  1028   0007a3 4f              		ld	c,a
+  1029   0007a4 e3              		ex	(sp),hl
+  1030   0007a5 e3              		ex	(sp),hl
+  1031   0007a6 e3              		ex	(sp),hl
+  1032   0007a7 e3              		ex	(sp),hl
+  1033   0007a8 0608            		ld	b,08h
+  1034   0007aa 3e0b            		ld	a,0bh
+  1035   0007ac 3e0b            		ld	a,0bh
+  1036   0007ae 00              		nop
+  1037   0007af 3d              		dec	a
+  1038   0007b0 c2f1f6          		jp	nz,0f6f1h
+  1039   0007b3 db70            		in	a,(70h)
+  1040   0007b5 17              		rla
+  1041   0007b6 cb1a            		rr	d
+  1042   0007b8 10f0            		djnz	ASMPC + 2 - 16		; (-10h)
+  1043   0007ba 42              		ld	b,d
+  1044   0007bb 72              		ld	(hl),d
+  1045   0007bc 23              		inc	hl
+  1046   0007bd 7c              		ld	a,h
+  1047   0007be fec3            		cp	0c3h
+  1048   0007c0 3f              		ccf
+  1049   0007c1 d8              		ret	c
+  1050                          
+  1051   0007c2 3e47            		ld	a,47h
+  1052   0007c4 d380            		out	(80h),a
+  1053   0007c6 af              		xor	a
+  1054   0007c7 d380            		out	(80h),a
+  1055   0007c9 11a101          		ld	de,01a1h
+  1056   0007cc db80            		in	a,(80h)
+  1057   0007ce b7              		or	a
+  1058   0007cf 20ce            		jr	nz,ASMPC + 2 - 50		; (-32h)
+  1059   0007d1 1b              		dec	de
+  1060   0007d2 7a              		ld	a,d
+  1061   0007d3 b3              		or	e
+  1062   0007d4 20f6            		jr	nz,ASMPC + 2 - 10		; (-0ah)
+  1063   0007d6 c9              		ret
+  1064                          
+  1065   0007d7 af              		xor	a
+  1066   0007d8 d350            		out	(50h),a
+  1067   0007da fb              		ei
+  1068   0007db 7e              		ld	a,(hl)
+  1069   0007dc 23              		inc	hl
+  1070   0007dd aa              		xor	d
+  1071   0007de 4f              		ld	c,a
+  1072   0007df 83              		add	a,e
+  1073   0007e0 ce00            		adc	a,00h
+  1074   0007e2 5f              		ld	e,a
+  1075   0007e3 3e2c            		ld	a,2ch
+  1076   0007e5 3212ff          		ld	(0ff12h),a
+  1077   0007e8 ed4d            		reti
+  1078                          
+  1079   0007ea 79              		ld	a,c
+  1080   0007eb d350            		out	(50h),a
+  1081   0007ed fb              		ei
+  1082   0007ee cb19            		rr	c
+  1083   0007f0 1005            		djnz	ASMPC + 2 + 5		; (+05h)
+  1084   0007f2 3e3b            		ld	a,3bh
+  1085   0007f4 3212ff          		ld	(0ff12h),a
+  1086   0007f7 ed4d            		reti
+  1087                          
+  1088   0007f9 3e01            		ld	a,01h
+  1089   0007fb d350            		out	(50h),a
+  1090   0007fd fb              		ei
+  1091   0007fe 7c              		ld	a,h
+  1092   0007ff fec3            		cp	0c3h
+  1093   000801 3009            		jr	nc,ASMPC + 2 + 9		; (+09h)
+  1094   000803 0608            		ld	b,08h
+  1095   000805 3e19            		ld	a,19h
+  1096   000807 3212ff          		ld	(0ff12h),a
+  1097   00080a ed4d            		reti
+  1098                          
+  1099   00080c 3e55            		ld	a,55h
+  1100   00080e 3212ff          		ld	(0ff12h),a
+  1101   000811 ed4d            		reti
+  1102                          
+  1103   000813 3e01            		ld	a,01h
+  1104   000815 d381            		out	(81h),a
+  1105   000817 fb              		ei
+  1106   000818 3eff            		ld	a,0ffh
+  1107   00081a 3212ff          		ld	(0ff12h),a
+  1108   00081d e1              		pop	hl
+  1109   00081e ed4d            		reti
+  1110                          
+  1111   000820 3e01            f762:		ld	a,01h
+  1112   000822 d352            		out	(52h),a
+  1113                          
+  1114   000824 21fec2          		ld	hl,0c2feh
+  1115   000827 f3              		di
+  1116   000828 cdd9f6          		call	0f6d9h
+  1117   00082b fb              		ei
+  1118   00082c 30f6            		jr	nc,ASMPC + 2 - 10		; (-0ah)
+  1119   00082e 2afec2          		ld	hl,(0c2feh)
+  1120   000831 11e680          		ld	de,80e6h
+  1121   000834 b7              		or	a
+  1122   000835 ed52            		sbc	hl,de
+  1123   000837 f1              		pop	af
+  1124   000838 cadef3          		jp	z,0f3deh
+  1125                          
+  1126   00083b 3e03            		ld	a,03h
+  1127   00083d 3233ff          		ld	(0ff33h),a
+  1128   000840 3e38            		ld	a,38h
+  1129   000842 3288f1          		ld	(0f188h),a
+  1130   000845 db50            		in	a,(50h)
+  1131   000847 cb5f            		bit	3,a
+  1132   000849 2005            		jr	nz,ASMPC + 2 + 5		; (+05h)
+  1133   00084b 3eff            		ld	a,0ffh
+  1134   00084d 3223f8          		ld	(0f823h),a
+  1135   000850 21e1f7          		ld	hl,0f7e1h
+  1136   000853 2219f0          		ld	(0f019h),hl
+  1137   000856 ed5b1930        		ld	de,(3019h)
+  1138   00085a b7              		or	a
+  1139   00085b ed52            		sbc	hl,de
+  1140   00085d 280c            		jr	z,ASMPC + 2 + 12		; (+0ch)
+  1141   00085f 210000          		ld	hl,0000h
+  1142   000862 224bff          		ld	(0ff4bh),hl
+  1143   000865 21ffbf          		ld	hl,0bfffh
+  1144   000868 224dff          		ld	(0ff4dh),hl
+  1145   00086b cdd1f8          		call	0f8d1h
+  1146   00086e 2a3aff          		ld	hl,(0ff3ah)
+  1147   000871 cdbdf7          		call	0f7bdh
+  1148   000874 2a3cff          		ld	hl,(0ff3ch)
+  1149   000877 cdbdf7          		call	0f7bdh
+  1150   00087a 18ef            		jr	ASMPC + 2 - 17		; (-11h)
+  1151   00087c e9              		jp	(hl)
+  1152   00087d db70            		in	a,(70h)
+  1153   00087f e68a            		and	8ah
+  1154   000881 fe8a            		cp	8ah
+  1155   000883 c0              		ret	nz
+  1156                          
+  1157   000884 f3              		di
+  1158   000885 af              		xor	a
+  1159   000886 3255ff          		ld	(0ff55h),a
+  1160   000889 d357            		out	(57h),a
+  1161   00088b 3ed7            		ld	a,0d7h
+  1162   00088d d380            		out	(80h),a
+  1163   00088f 3e01            		ld	a,01h
+  1164   000891 d380            		out	(80h),a
+  1165   000893 2199f6          		ld	hl,0f699h
+  1166   000896 2210ff          		ld	(0ff10h),hl
+  1167   000899 fb              		ei
+  1168   00089a 21e2f7          		ld	hl,0f7e2h
+  1169   00089d 223aff          		ld	(0ff3ah),hl
+  1170   0008a0 c9              		ret
+  1171                          
+  1172   0008a1 3a55ff          		ld	a,(0ff55h)
+  1173   0008a4 b7              		or	a
+  1174   0008a5 c8              		ret	z
+  1175                          
+  1176   0008a6 fe01            		cp	01h
+  1177   0008a8 2808            		jr	z,ASMPC + 2 + 8		; (+08h)
+  1178   0008aa f3              		di
+  1179   0008ab 3e03            		ld	a,03h
+  1180   0008ad d380            		out	(80h),a
+  1181   0008af fb              		ei
+  1182   0008b0 1816            		jr	ASMPC + 2 + 22		; (+16h)
+  1183   0008b2 3afbc2          		ld	a,(0c2fbh)
+  1184   0008b5 2a38ff          		ld	hl,(0ff38h)
+  1185   0008b8 cd10f8          		call	0f810h
+  1186   0008bb 200b            		jr	nz,ASMPC + 2 + 11		; (+0bh)
+  1187   0008bd 3afcc2          		ld	a,(0c2fch)
+  1188   0008c0 cd10f8          		call	0f810h
+  1189   0008c3 2003            		jr	nz,ASMPC + 2 + 3		; (+03h)
+  1190   0008c5 cdbdf7          		call	0f7bdh
+  1191   0008c8 21bef7          		ld	hl,0f7beh
+  1192   0008cb 223aff          		ld	(0ff3ah),hl
+  1193   0008ce c9              		ret
+  1194                          
+  1195   0008cf 4e              		ld	c,(hl)
+  1196   0008d0 23              		inc	hl
+  1197   0008d1 46              		ld	b,(hl)
+  1198   0008d2 23              		inc	hl
+  1199   0008d3 edb1            		cpir
+  1200   0008d5 c0              		ret	nz
+  1201                          
+  1202   0008d6 f5              		push	af
+  1203   0008d7 09              		add	hl,bc
+  1204   0008d8 09              		add	hl,bc
+  1205   0008d9 09              		add	hl,bc
+  1206   0008da 7e              		ld	a,(hl)
+  1207   0008db 23              		inc	hl
+  1208   0008dc 66              		ld	h,(hl)
+  1209   0008dd 6f              		ld	l,a
+  1210   0008de f1              		pop	af
+  1211   0008df c9              		ret
+  1212                          
+  1213   0008e0 0600            		ld	b,00h
+  1214   0008e2 40              		ld	b,b
+  1215   0008e3 313233          		ld	sp,3332h
+  1216   0008e6 34              		inc	(hl)
+  1217   0008e7 5a              		ld	e,d
+  1218   0008e8 54              		ld	d,h
+  1219   0008e9 f8              		ret	m
+  1220                          
+  1221   0008ea 3d              		dec	a
+  1222   0008eb f8              		ret	m
+  1223                          
+  1224   0008ec 3d              		dec	a
+  1225   0008ed f8              		ret	m
+  1226                          
+  1227   0008ee 3d              		dec	a
+  1228   0008ef f8              		ret	m
+  1229                          
+  1230   0008f0 3d              		dec	a
+  1231   0008f1 f8              		ret	m
+  1232                          
+  1233   0008f2 35              		dec	(hl)
+  1234   0008f3 f8              		ret	m
+  1235                          
+  1236   0008f4 02              		ld	(bc),a
+  1237   0008f5 00              		nop
+  1238   0008f6 53              		ld	d,e
+  1239   0008f7 57              		ld	d,a
+  1240   0008f8 78              		ld	a,b
+  1241   0008f9 f8              		ret	m
+  1242                          
+  1243   0008fa 62              		ld	h,d
+  1244   0008fb f8              		ret	m
+  1245                          
+  1246   0008fc 07              		rlca
+  1247   0008fd 00              		nop
+  1248   0008fe 52              		ld	d,d
+  1249   0008ff 53              		ld	d,e
+  1250   000900 57              		ld	d,a
+  1251   000901 50              		ld	d,b
+  1252   000902 4e              		ld	c,(hl)
+  1253   000903 4f              		ld	c,a
+  1254   000904 2138fb          		ld	hl,0fb38h
+  1255   000907 05              		dec	b
+  1256   000908 fce7fb          		call	m,0fbe7h
+  1257   00090b 05              		dec	b
+  1258   00090c f9              		ld	sp,hl
+  1259   00090d 08              		ex	af,af'
+  1260   00090e f9              		ld	sp,hl
+  1261   00090f dbfa            		in	a,(0fah)
+  1262   000911 8c              		adc	a,h
+  1263   000912 f9              		ld	sp,hl
+  1264   000913 04              		inc	b
+  1265   000914 00              		nop
+  1266   000915 52              		ld	d,d
+  1267   000916 57              		ld	d,a
+  1268   000917 53              		ld	d,e
+  1269   000918 47              		ld	b,a
+  1270   000919 b4              		or	h
+  1271   00091a fca6fc          		call	m,0fca6h
+  1272   00091d 7b              		ld	a,e
+  1273   00091e fc5ffc          		call	m,0fc5fh
+  1274   000921 cd4afc          		call	0fc4ah
+  1275   000924 2143ff          		ld	hl,0ff43h
+  1276   000927 11fcc2          		ld	de,0c2fch
+  1277   00092a d5              		push	de
+  1278   00092b 010400          		ld	bc,0004h
+  1279   00092e edb0            		ldir
+  1280   000930 e1              		pop	hl
+  1281   000931 114300          		ld	de,0043h
+  1282   000934 c36cf6          		jp	0f66ch
+  1283   000937 cd4afc          		call	0fc4ah
+  1284   00093a cdb9f6          		call	0f6b9h
+  1285   00093d c0              		ret	nz
+  1286                          
+  1287   00093e 112800          		ld	de,0028h
+  1288   000941 b7              		or	a
+  1289   000942 ed52            		sbc	hl,de
+  1290   000944 c0              		ret	nz
+  1291                          
+  1292   000945 cd4afc          		call	0fc4ah
+  1293   000948 2100c1          		ld	hl,0c100h
+  1294   00094b 0628            		ld	b,28h
+  1295   00094d 7e              		ld	a,(hl)
+  1296   00094e fe9b            		cp	9bh
+  1297   000950 2005            		jr	nz,ASMPC + 2 + 5		; (+05h)
+  1298   000952 213eff          		ld	hl,0ff3eh
+  1299   000955 46              		ld	b,(hl)
+  1300   000956 23              		inc	hl
+  1301   000957 e5              		push	hl
+  1302   000958 2a4fff          		ld	hl,(0ff4fh)
+  1303   00095b ed5b4dff        		ld	de,(0ff4dh)
+  1304   00095f b7              		or	a
+  1305   000960 ed52            		sbc	hl,de
+  1306   000962 e1              		pop	hl
+  1307   000963 380e            		jr	c,ASMPC + 2 + 14		; (+0eh)
+  1308   000965 e5              		push	hl
+  1309   000966 c5              		push	bc
+  1310   000967 cdd1f8          		call	0f8d1h
+  1311   00096a c1              		pop	bc
+  1312   00096b e1              		pop	hl
+  1313   00096c db70            		in	a,(70h)
+  1314   00096e e602            		and	02h
+  1315   000970 20e5            		jr	nz,ASMPC + 2 - 27		; (-1bh)
+  1316   000972 c9              		ret
+  1317                          
+  1318   000973 7e              		ld	a,(hl)
+  1319   000974 23              		inc	hl
+  1320   000975 e5              		push	hl
+  1321   000976 c5              		push	bc
+  1322   000977 2a51ff          		ld	hl,(0ff51h)
+  1323   00097a cdf1f8          		call	0f8f1h
+  1324   00097d ed5351ff        		ld	(0ff51h),de
+  1325   000981 77              		ld	(hl),a
+  1326   000982 2a4fff          		ld	hl,(0ff4fh)
+  1327   000985 23              		inc	hl
+  1328   000986 224fff          		ld	(0ff4fh),hl
+  1329   000989 c1              		pop	bc
+  1330   00098a e1              		pop	hl
+  1331   00098b 10c0            		djnz	ASMPC + 2 - 64		; (-40h)
+  1332   00098d c354fc          		jp	0fc54h
+  1333   000990 2a4fff          		ld	hl,(0ff4fh)
+  1334   000993 7c              		ld	a,h
+  1335   000994 b5              		or	l
+  1336   000995 c8              		ret	z
+  1337                          
+  1338   000996 cd15f0          		call	0f015h
+  1339   000999 c0              		ret	nz
+  1340                          
+  1341   00099a 2a53ff          		ld	hl,(0ff53h)
+  1342   00099d cdf1f8          		call	0f8f1h
+  1343   0009a0 ed5353ff        		ld	(0ff53h),de
+  1344   0009a4 4e              		ld	c,(hl)
+  1345   0009a5 cd12f0          		call	0f012h
+  1346   0009a8 2a4fff          		ld	hl,(0ff4fh)
+  1347   0009ab 2b              		dec	hl
+  1348   0009ac 224fff          		ld	(0ff4fh),hl
+  1349   0009af c9              		ret
+  1350                          
+  1351   0009b0 eb              		ex	de,hl
+  1352   0009b1 2a4bff          		ld	hl,(0ff4bh)
+  1353   0009b4 19              		add	hl,de
+  1354   0009b5 e5              		push	hl
+  1355   0009b6 13              		inc	de
+  1356   0009b7 2a4dff          		ld	hl,(0ff4dh)
+  1357   0009ba b7              		or	a
+  1358   0009bb ed52            		sbc	hl,de
+  1359   0009bd 3003            		jr	nc,ASMPC + 2 + 3		; (+03h)
+  1360   0009bf 110000          		ld	de,0000h
+  1361   0009c2 e1              		pop	hl
+  1362   0009c3 c9              		ret
+  1363                          
+  1364   0009c4 af              		xor	a
+  1365   0009c5 1802            		jr	ASMPC + 2 + 2		; (+02h)
+  1366   0009c7 3e01            		ld	a,01h
+  1367   0009c9 32b5ff          		ld	(0ffb5h),a
+  1368   0009cc cd28fc          		call	0fc28h
+  1369   0009cf d8              		ret	c
+  1370                          
+  1371   0009d0 cd4afc          		call	0fc4ah
+  1372   0009d3 cdb9f6          		call	0f6b9h
+  1373   0009d6 c0              		ret	nz
+  1374                          
+  1375   0009d7 22a9ff          		ld	(0ffa9h),hl
+  1376   0009da 118000          		ld	de,0080h
+  1377   0009dd b7              		or	a
+  1378   0009de ed52            		sbc	hl,de
+  1379   0009e0 2804            		jr	z,ASMPC + 2 + 4		; (+04h)
+  1380   0009e2 b7              		or	a
+  1381   0009e3 ed52            		sbc	hl,de
+  1382   0009e5 c0              		ret	nz
+  1383                          
+  1384   0009e6 cd4afc          		call	0fc4ah
+  1385   0009e9 cd10fa          		call	0fa10h
+  1386   0009ec 204e            		jr	nz,ASMPC + 2 + 78		; (+4eh)
+  1387   0009ee 2100c1          		ld	hl,0c100h
+  1388   0009f1 229cff          		ld	(0ff9ch),hl
+  1389   0009f4 3aa9ff          		ld	a,(0ffa9h)
+  1390   0009f7 47              		ld	b,a
+  1391   0009f8 7e              		ld	a,(hl)
+  1392   0009f9 2f              		cpl
+  1393   0009fa 77              		ld	(hl),a
+  1394   0009fb 23              		inc	hl
+  1395   0009fc 10fa            		djnz	ASMPC + 2 - 6		; (-06h)
+  1396   0009fe 3e02            		ld	a,02h
+  1397   000a00 3298ff          		ld	(0ff98h),a
+  1398   000a03 dd2198ff        		ld	ix,0ff98h
+  1399   000a07 cd0ff0          		call	0f00fh
+  1400   000a0a 3aa0ff          		ld	a,(0ffa0h)
+  1401   000a0d b7              		or	a
+  1402   000a0e 202c            		jr	nz,ASMPC + 2 + 44		; (+2ch)
+  1403   000a10 3ab5ff          		ld	a,(0ffb5h)
+  1404   000a13 b7              		or	a
+  1405   000a14 2826            		jr	z,ASMPC + 2 + 38		; (+26h)
+  1406   000a16 3e01            		ld	a,01h
+  1407   000a18 3298ff          		ld	(0ff98h),a
+  1408   000a1b 2100c3          		ld	hl,0c300h
+  1409   000a1e 229cff          		ld	(0ff9ch),hl
+  1410   000a21 cd0ff0          		call	0f00fh
+  1411   000a24 3aa0ff          		ld	a,(0ffa0h)
+  1412   000a27 b7              		or	a
+  1413   000a28 2012            		jr	nz,ASMPC + 2 + 18		; (+12h)
+  1414   000a2a 2100c1          		ld	hl,0c100h
+  1415   000a2d 1100c3          		ld	de,0c300h
+  1416   000a30 3a9eff          		ld	a,(0ff9eh)
+  1417   000a33 47              		ld	b,a
+  1418   000a34 1a              		ld	a,(de)
+  1419   000a35 ae              		xor	(hl)
+  1420   000a36 200b            		jr	nz,ASMPC + 2 + 11		; (+0bh)
+  1421   000a38 23              		inc	hl
+  1422   000a39 13              		inc	de
+  1423   000a3a 10f8            		djnz	ASMPC + 2 - 8		; (-08h)
+  1424   000a3c cde3f9          		call	0f9e3h
+  1425   000a3f 7b              		ld	a,e
+  1426   000a40 c356fc          		jp	0fc56h
+  1427   000a43 af              		xor	a
+  1428   000a44 cd06fa          		call	0fa06h
+  1429   000a47 7b              		ld	a,e
+  1430   000a48 c356fc          		jp	0fc56h
+  1431   000a4b cd28fc          		call	0fc28h
+  1432   000a4e d8              		ret	c
+  1433                          
+  1434   000a4f cd4afc          		call	0fc4ah
+  1435   000a52 cd10fa          		call	0fa10h
+  1436   000a55 f5              		push	af
+  1437   000a56 280f            		jr	z,ASMPC + 2 + 15		; (+0fh)
+  1438   000a58 fd5606          		ld	d,(iy+06h)
+  1439   000a5b fd5e07          		ld	e,(iy+07h)
+  1440   000a5e 7a              		ld	a,d
+  1441   000a5f b3              		or	e
+  1442   000a60 2009            		jr	nz,ASMPC + 2 + 9		; (+09h)
+  1443   000a62 118000          		ld	de,0080h
+  1444   000a65 1804            		jr	ASMPC + 2 + 4		; (+04h)
+  1445   000a67 ed5b9eff        		ld	de,(0ff9eh)
+  1446   000a6b 2afdc2          		ld	hl,(0c2fdh)
+  1447   000a6e 010400          		ld	bc,0004h
+  1448   000a71 b7              		or	a
+  1449   000a72 ed42            		sbc	hl,bc
+  1450   000a74 3003            		jr	nc,ASMPC + 2 + 3		; (+03h)
+  1451   000a76 118000          		ld	de,0080h
+  1452   000a79 ed53a9ff        		ld	(0ffa9h),de
+  1453   000a7d 2100c3          		ld	hl,0c300h
+  1454   000a80 b7              		or	a
+  1455   000a81 ed52            		sbc	hl,de
+  1456   000a83 f1              		pop	af
+  1457   000a84 2014            		jr	nz,ASMPC + 2 + 20		; (+14h)
+  1458   000a86 229cff          		ld	(0ff9ch),hl
+  1459   000a89 3e01            		ld	a,01h
+  1460   000a8b 3298ff          		ld	(0ff98h),a
+  1461   000a8e dd2198ff        		ld	ix,0ff98h
+  1462   000a92 e5              		push	hl
+  1463   000a93 cd0ff0          		call	0f00fh
+  1464   000a96 e1              		pop	hl
+  1465   000a97 3aa0ff          		ld	a,(0ffa0h)
+  1466   000a9a cde3f9          		call	0f9e3h
+  1467   000a9d 16ff            		ld	d,0ffh
+  1468   000a9f c36cf6          		jp	0f66ch
+  1469   000aa2 b7              		or	a
+  1470   000aa3 200a            		jr	nz,ASMPC + 2 + 10		; (+0ah)
+  1471   000aa5 fd770d          		ld	(iy+0dh),a
+  1472   000aa8 1e43            		ld	e,43h
+  1473   000aaa fdcb0c96        		res	2,(iy+0ch)
+  1474   000aae c9              		ret
+  1475                          
+  1476   000aaf cb77            		bit	6,a
+  1477   000ab1 2802            		jr	z,ASMPC + 2 + 2		; (+02h)
+  1478   000ab3 e69f            		and	9fh
+  1479   000ab5 cb6f            		bit	5,a
+  1480   000ab7 2802            		jr	z,ASMPC + 2 + 2		; (+02h)
+  1481   000ab9 f660            		or	60h
+  1482   000abb 4f              		ld	c,a
+  1483   000abc e681            		and	81h
+  1484   000abe 79              		ld	a,c
+  1485   000abf 2804            		jr	z,ASMPC + 2 + 4		; (+04h)
+  1486   000ac1 e67e            		and	7eh
+  1487   000ac3 f610            		or	10h
+  1488   000ac5 fd770d          		ld	(iy+0dh),a
+  1489   000ac8 1e45            		ld	e,45h
+  1490   000aca fdcb0cd6        		set	2,(iy+0ch)
+  1491   000ace c9              		ret
+  1492                          
+  1493   000acf 3a2eff          		ld	a,(0ff2eh)
+  1494   000ad2 b7              		or	a
+  1495   000ad3 2811            		jr	z,ASMPC + 2 + 17		; (+11h)
+  1496   000ad5 af              		xor	a
+  1497   000ad6 322eff          		ld	(0ff2eh),a
+  1498   000ad9 2164ff          		ld	hl,0ff64h
+  1499   000adc 111000          		ld	de,0010h
+  1500   000adf 0604            		ld	b,04h
+  1501   000ae1 cb86            		res	0,(hl)
+  1502   000ae3 19              		add	hl,de
+  1503   000ae4 10fb            		djnz	ASMPC + 2 - 5		; (-05h)
+  1504   000ae6 fdcb0e46        		bit	0,(iy+0eh)
+  1505   000aea 206d            		jr	nz,ASMPC + 2 + 109		; (+6dh)
+  1506   000aec 3e03            		ld	a,03h
+  1507   000aee 3298ff          		ld	(0ff98h),a
+  1508   000af1 3a99ff          		ld	a,(0ff99h)
+  1509   000af4 2120ff          		ld	hl,0ff20h
+  1510   000af7 85              		add	a,l
+  1511   000af8 6f              		ld	l,a
+  1512   000af9 7e              		ld	a,(hl)
+  1513   000afa fe50            		cp	50h
+  1514   000afc 3801            		jr	c,ASMPC + 2 + 1		; (+01h)
+  1515   000afe af              		xor	a
+  1516   000aff 329aff          		ld	(0ff9ah),a
+  1517   000b02 21abff          		ld	hl,0ffabh
+  1518   000b05 229cff          		ld	(0ff9ch),hl
+  1519   000b08 dd2198ff        		ld	ix,0ff98h
+  1520   000b0c cd0ff0          		call	0f00fh
+  1521   000b0f 3aa0ff          		ld	a,(0ffa0h)
+  1522   000b12 b7              		or	a
+  1523   000b13 c0              		ret	nz
+  1524                          
+  1525   000b14 3aaeff          		ld	a,(0ffaeh)
+  1526   000b17 cdcdfa          		call	0facdh
+  1527   000b1a fd7006          		ld	(iy+06h),b
+  1528   000b1d fd7107          		ld	(iy+07h),c
+  1529   000b20 3a9eff          		ld	a,(0ff9eh)
+  1530   000b23 07              		rlca
+  1531   000b24 07              		rlca
+  1532   000b25 07              		rlca
+  1533   000b26 2f              		cpl
+  1534   000b27 e606            		and	06h
+  1535   000b29 fd7705          		ld	(iy+05h),a
+  1536   000b2c cb4f            		bit	1,a
+  1537   000b2e 2807            		jr	z,ASMPC + 2 + 7		; (+07h)
+  1538   000b30 3e4d            		ld	a,4dh
+  1539   000b32 211a00          		ld	hl,001ah
+  1540   000b35 1805            		jr	ASMPC + 2 + 5		; (+05h)
+  1541   000b37 3e28            		ld	a,28h
+  1542   000b39 211200          		ld	hl,0012h
+  1543   000b3c fdbe00          		cp	(iy+00h)
+  1544   000b3f 3803            		jr	c,ASMPC + 2 + 3		; (+03h)
+  1545   000b41 fd7700          		ld	(iy+00h),a
+  1546   000b44 fd7402          		ld	(iy+02h),h
+  1547   000b47 fd7503          		ld	(iy+03h),l
+  1548   000b4a fdcb0ec6        		set	0,(iy+0eh)
+  1549   000b4e 2a96ff          		ld	hl,(0ff96h)
+  1550   000b51 7c              		ld	a,h
+  1551   000b52 b5              		or	l
+  1552   000b53 2004            		jr	nz,ASMPC + 2 + 4		; (+04h)
+  1553   000b55 fd2296ff        		ld	(0ff96h),iy
+  1554   000b59 2afdc2          		ld	hl,(0c2fdh)
+  1555   000b5c 2b              		dec	hl
+  1556   000b5d 1600            		ld	d,00h
+  1557   000b5f fd5e03          		ld	e,(iy+03h)
+  1558   000b62 3eff            		ld	a,0ffh
+  1559   000b64 3c              		inc	a
+  1560   000b65 b7              		or	a
+  1561   000b66 ed52            		sbc	hl,de
+  1562   000b68 30fa            		jr	nc,ASMPC + 2 - 6		; (-06h)
+  1563   000b6a 19              		add	hl,de
+  1564   000b6b 23              		inc	hl
+  1565   000b6c 4d              		ld	c,l
+  1566   000b6d 219bff          		ld	hl,0ff9bh
+  1567   000b70 71              		ld	(hl),c
+  1568   000b71 fdbe00          		cp	(iy+00h)
+  1569   000b74 3808            		jr	c,ASMPC + 2 + 8		; (+08h)
+  1570   000b76 fd9600          		sub	(iy+00h)
+  1571   000b79 2199ff          		ld	hl,0ff99h
+  1572   000b7c cbfe            		set	7,(hl)
+  1573   000b7e 329aff          		ld	(0ff9ah),a
+  1574   000b81 fd6606          		ld	h,(iy+06h)
+  1575   000b84 fd6e07          		ld	l,(iy+07h)
+  1576   000b87 229eff          		ld	(0ff9eh),hl
+  1577   000b8a af              		xor	a
+  1578   000b8b c9              		ret
+  1579                          
+  1580   000b8c 018000          		ld	bc,0080h
+  1581   000b8f e603            		and	03h
+  1582   000b91 c8              		ret	z
+  1583                          
+  1584   000b92 cb21            		sla	c
+  1585   000b94 cb10            		rl	b
+  1586   000b96 3d              		dec	a
+  1587   000b97 20f9            		jr	nz,ASMPC + 2 - 7		; (-07h)
+  1588   000b99 c9              		ret
+  1589                          
+  1590   000b9a cd28fc          		call	0fc28h
+  1591   000b9d d8              		ret	c
+  1592                          
+  1593   000b9e cd4afc          		call	0fc4ah
+  1594   000ba1 cdd3fb          		call	0fbd3h
+  1595   000ba4 3ac9ff          		ld	a,(0ffc9h)
+  1596   000ba7 f5              		push	af
+  1597   000ba8 3e00            		ld	a,00h
+  1598   000baa 3298ff          		ld	(0ff98h),a
+  1599   000bad dd2198ff        		ld	ix,0ff98h
+  1600   000bb1 cd0ff0          		call	0f00fh
+  1601   000bb4 fd4e0c          		ld	c,(iy+0ch)
+  1602   000bb7 fd360c00        		ld	(iy+0ch),00h
+  1603   000bbb f1              		pop	af
+  1604   000bbc b7              		or	a
+  1605   000bbd 2804            		jr	z,ASMPC + 2 + 4		; (+04h)
+  1606   000bbf cbe1            		set	4,c
+  1607   000bc1 1802            		jr	ASMPC + 2 + 2		; (+02h)
+  1608   000bc3 cba1            		res	4,c
+  1609   000bc5 fdcb0556        		bit	2,(iy+05h)
+  1610   000bc9 2804            		jr	z,ASMPC + 2 + 4		; (+04h)
+  1611   000bcb cbe9            		set	5,c
+  1612   000bcd 1802            		jr	ASMPC + 2 + 2		; (+02h)
+  1613   000bcf cba9            		res	5,c
+  1614   000bd1 ddcb0876        		bit	6,(ix+08h)
+  1615   000bd5 2804            		jr	z,ASMPC + 2 + 4		; (+04h)
+  1616   000bd7 cbd9            		set	3,c
+  1617   000bd9 1802            		jr	ASMPC + 2 + 2		; (+02h)
+  1618   000bdb cb99            		res	3,c
+  1619   000bdd 21fcc2          		ld	hl,0c2fch
+  1620   000be0 e5              		push	hl
+  1621   000be1 71              		ld	(hl),c
+  1622   000be2 23              		inc	hl
+  1623   000be3 fd7e0d          		ld	a,(iy+0dh)
+  1624   000be6 2f              		cpl
+  1625   000be7 77              		ld	(hl),a
+  1626   000be8 23              		inc	hl
+  1627   000be9 36e0            		ld	(hl),0e0h
+  1628   000beb 23              		inc	hl
+  1629   000bec 3a2dff          		ld	a,(0ff2dh)
+  1630   000bef 77              		ld	(hl),a
+  1631   000bf0 e1              		pop	hl
+  1632   000bf1 114300          		ld	de,0043h
+  1633   000bf4 c36cf6          		jp	0f66ch
+  1634   000bf7 cd28fc          		call	0fc28h
+  1635   000bfa d8              		ret	c
+  1636                          
+  1637   000bfb 2a4fff          		ld	hl,(0ff4fh)
+  1638   000bfe 7c              		ld	a,h
+  1639   000bff b5              		or	l
+  1640   000c00 c0              		ret	nz
+  1641                          
+  1642   000c01 cdd3fb          		call	0fbd3h
+  1643   000c04 c8              		ret	z
+  1644                          
+  1645   000c05 cd4afc          		call	0fc4ah
+  1646   000c08 3e00            		ld	a,00h
+  1647   000c0a 3298ff          		ld	(0ff98h),a
+  1648   000c0d dd2198ff        		ld	ix,0ff98h
+  1649   000c11 cd0ff0          		call	0f00fh
+  1650   000c14 cdcbf3          		call	0f3cbh
+  1651   000c17 3a2fff          		ld	a,(0ff2fh)
+  1652   000c1a fdcb0556        		bit	2,(iy+05h)
+  1653   000c1e 2807            		jr	z,ASMPC + 2 + 7		; (+07h)
+  1654   000c20 cbbf            		res	7,a
+  1655   000c22 2100c2          		ld	hl,0c200h
+  1656   000c25 1805            		jr	ASMPC + 2 + 5		; (+05h)
+  1657   000c27 cbff            		set	7,a
+  1658   000c29 2180c2          		ld	hl,0c280h
+  1659   000c2c 322fff          		ld	(0ff2fh),a
+  1660   000c2f d330            		out	(30h),a
+  1661   000c31 e5              		push	hl
+  1662   000c32 22c1ff          		ld	(0ffc1h),hl
+  1663   000c35 210100          		ld	hl,0001h
+  1664   000c38 22bfff          		ld	(0ffbfh),hl
+  1665   000c3b 2a49ff          		ld	hl,(0ff49h)
+  1666   000c3e 11b6ff          		ld	de,0ffb6h
+  1667   000c41 010700          		ld	bc,0007h
+  1668   000c44 07              		rlca
+  1669   000c45 07              		rlca
+  1670   000c46 e603            		and	03h
+  1671   000c48 2804            		jr	z,ASMPC + 2 + 4		; (+04h)
+  1672   000c4a 09              		add	hl,bc
+  1673   000c4b 3d              		dec	a
+  1674   000c4c 20fc            		jr	nz,ASMPC + 2 - 4		; (-04h)
+  1675   000c4e edb0            		ldir
+  1676   000c50 3aa0ff          		ld	a,(0ffa0h)
+  1677   000c53 e6c0            		and	0c0h
+  1678   000c55 2013            		jr	nz,ASMPC + 2 + 19		; (+13h)
+  1679   000c57 fd7e04          		ld	a,(iy+04h)
+  1680   000c5a 32bdff          		ld	(0ffbdh),a
+  1681   000c5d fd7e00          		ld	a,(iy+00h)
+  1682   000c60 32beff          		ld	(0ffbeh),a
+  1683   000c63 fde5            		push	iy
+  1684   000c65 cdbefc          		call	0fcbeh
+  1685   000c68 fde1            		pop	iy
+  1686   000c6a e1              		pop	hl
+  1687   000c6b cde3f9          		call	0f9e3h
+  1688   000c6e 1600            		ld	d,00h
+  1689   000c70 cd6cf6          		call	0f66ch
+  1690   000c73 c33cf0          		jp	0f03ch
+  1691   000c76 9f              		sbc	a,a
+  1692   000c77 fee2            		cp	0e2h
+  1693   000c79 fe1a            		cp	1ah
+  1694   000c7b b0              		or	b
+  1695   000c7c 2835            		jr	z,ASMPC + 2 + 53		; (+35h)
+  1696   000c7e fe68            		cp	68h
+  1697   000c80 fe12            		cp	12h
+  1698   000c82 6a              		ld	l,d
+  1699   000c83 187a            		jr	ASMPC + 2 + 122		; (+7ah)
+  1700   000c85 fec8            		cp	0c8h
+  1701   000c87 fe1a            		cp	1ah
+  1702   000c89 58              		ld	e,b
+  1703   000c8a 14              		inc	d
+  1704   000c8b 16fe            		ld	d,0feh
+  1705   000c8d 56              		ld	d,(hl)
+  1706   000c8e fe12            		cp	12h
+  1707   000c90 35              		dec	(hl)
+  1708   000c91 0c              		inc	c
+  1709   000c92 fd7e00          		ld	a,(iy+00h)
+  1710   000c95 b7              		or	a
+  1711   000c96 c0              		ret	nz
+  1712                          
+  1713   000c97 2a96ff          		ld	hl,(0ff96h)
+  1714   000c9a 7c              		ld	a,h
+  1715   000c9b b5              		or	l
+  1716   000c9c c8              		ret	z
+  1717                          
+  1718   000c9d fde5            		push	iy
+  1719   000c9f d1              		pop	de
+  1720   000ca0 010c00          		ld	bc,000ch
+  1721   000ca3 edb0            		ldir
+  1722   000ca5 c9              		ret
+  1723                          
+  1724   000ca6 cd28fc          		call	0fc28h
+  1725   000ca9 d8              		ret	c
+  1726                          
+  1727   000caa cdd3fb          		call	0fbd3h
+  1728   000cad c8              		ret	z
+  1729                          
+  1730   000cae cd4afc          		call	0fc4ah
+  1731   000cb1 fde5            		push	iy
+  1732   000cb3 e1              		pop	hl
+  1733   000cb4 11f4c2          		ld	de,0c2f4h
+  1734   000cb7 d5              		push	de
+  1735   000cb8 010c00          		ld	bc,000ch
+  1736   000cbb edb0            		ldir
+  1737   000cbd e1              		pop	hl
+  1738   000cbe 114300          		ld	de,0043h
+  1739   000cc1 c36cf6          		jp	0f66ch
+  1740   000cc4 cd28fc          		call	0fc28h
+  1741   000cc7 d8              		ret	c
+  1742                          
+  1743   000cc8 cd4afc          		call	0fc4ah
+  1744   000ccb cdb9f6          		call	0f6b9h
+  1745   000cce c0              		ret	nz
+  1746                          
+  1747   000ccf 110c00          		ld	de,000ch
+  1748   000cd2 b7              		or	a
+  1749   000cd3 ed52            		sbc	hl,de
+  1750   000cd5 c0              		ret	nz
+  1751                          
+  1752   000cd6 cd4afc          		call	0fc4ah
+  1753   000cd9 2100c1          		ld	hl,0c100h
+  1754   000cdc fde5            		push	iy
+  1755   000cde d1              		pop	de
+  1756   000cdf 010c00          		ld	bc,000ch
+  1757   000ce2 edb0            		ldir
+  1758   000ce4 c354fc          		jp	0fc54h
+  1759   000ce7 3afbc2          		ld	a,(0c2fbh)
+  1760   000cea d631            		sub	31h
+  1761   000cec fe04            		cp	04h
+  1762   000cee 3f              		ccf
+  1763   000cef d8              		ret	c
+  1764                          
+  1765   000cf0 2600            		ld	h,00h
+  1766   000cf2 6f              		ld	l,a
+  1767   000cf3 29              		add	hl,hl
+  1768   000cf4 29              		add	hl,hl
+  1769   000cf5 29              		add	hl,hl
+  1770   000cf6 29              		add	hl,hl
+  1771   000cf7 0156ff          		ld	bc,0ff56h
+  1772   000cfa 09              		add	hl,bc
+  1773   000cfb e5              		push	hl
+  1774   000cfc fde1            		pop	iy
+  1775   000cfe fdcb0876        		bit	6,(iy+08h)
+  1776   000d02 37              		scf
+  1777   000d03 c8              		ret	z
+  1778                          
+  1779   000d04 3299ff          		ld	(0ff99h),a
+  1780   000d07 af              		xor	a
+  1781   000d08 c9              		ret
+  1782                          
+  1783   000d09 db70            		in	a,(70h)
+  1784   000d0b cb4f            		bit	1,a
+  1785   000d0d 28fa            		jr	z,ASMPC + 2 - 6		; (-06h)
+  1786   000d0f 3e41            		ld	a,41h
+  1787   000d11 1802            		jr	ASMPC + 2 + 2		; (+02h)
+  1788   000d13 3e43            		ld	a,43h
+  1789   000d15 2101c3          		ld	hl,0c301h
+  1790   000d18 77              		ld	(hl),a
+  1791   000d19 1600            		ld	d,00h
+  1792   000d1b c384f6          		jp	0f684h
+  1793   000d1e cd4afc          		call	0fc4ah
+  1794   000d21 cd9cfc          		call	0fc9ch
+  1795   000d24 2100c3          		ld	hl,0c300h
+  1796   000d27 b7              		or	a
+  1797   000d28 ed42            		sbc	hl,bc
+  1798   000d2a e5              		push	hl
+  1799   000d2b eb              		ex	de,hl
+  1800   000d2c 2ab2fc          		ld	hl,(0fcb2h)
+  1801   000d2f f3              		di
+  1802   000d30 edb0            		ldir
+  1803   000d32 fb              		ei
+  1804   000d33 e1              		pop	hl
+  1805   000d34 114300          		ld	de,0043h
+  1806   000d37 c36cf6          		jp	0f66ch
+  1807   000d3a cd4afc          		call	0fc4ah
+  1808   000d3d cdb9f6          		call	0f6b9h
+  1809   000d40 c0              		ret	nz
+  1810                          
+  1811   000d41 cd9cfc          		call	0fc9ch
+  1812   000d44 b7              		or	a
+  1813   000d45 ed42            		sbc	hl,bc
+  1814   000d47 c0              		ret	nz
+  1815                          
+  1816   000d48 c5              		push	bc
+  1817   000d49 cd4afc          		call	0fc4ah
+  1818   000d4c c1              		pop	bc
+  1819   000d4d 2100c1          		ld	hl,0c100h
+  1820   000d50 ed5bb2fc        		ld	de,(0fcb2h)
+  1821   000d54 f3              		di
+  1822   000d55 edb0            		ldir
+  1823   000d57 fb              		ei
+  1824   000d58 c354fc          		jp	0fc54h
+  1825   000d5b 3afdc2          		ld	a,(0c2fdh)
+  1826   000d5e 4f              		ld	c,a
+  1827   000d5f 0600            		ld	b,00h
+  1828   000d61 b7              		or	a
+  1829   000d62 c0              		ret	nz
+  1830                          
+  1831   000d63 04              		inc	b
+  1832   000d64 c9              		ret
+  1833                          
+  1834   000d65 cd4afc          		call	0fc4ah
+  1835   000d68 2afdc2          		ld	hl,(0c2fdh)
+  1836   000d6b 22b2fc          		ld	(0fcb2h),hl
+  1837   000d6e c354fc          		jp	0fc54h
+  1838   000d71 00              		nop
+  1839   000d72 00              		nop
+  1840   000d73 cd4afc          		call	0fc4ah
+  1841   000d76 cd54fc          		call	0fc54h
+  1842   000d79 2afdc2          		ld	hl,(0c2fdh)
+  1843   000d7c e9              		jp	(hl)
+  1844   000d7d af              		xor	a
+  1845   000d7e d356            		out	(56h),a
+  1846   000d80 3c              		inc	a
+  1847   000d81 d354            		out	(54h),a
+  1848   000d83 3e0b            		ld	a,0bh
+  1849   000d85 cd6bf3          		call	0f36bh
+  1850   000d88 ee04            		xor	04h
+  1851   000d8a e684            		and	84h
+  1852   000d8c c29afd          		jp	nz,0fd9ah
+  1853   000d8f 2100c3          		ld	hl,0c300h
+  1854   000d92 3abcff          		ld	a,(0ffbch)
+  1855   000d95 3c              		inc	a
+  1856   000d96 47              		ld	b,a
+  1857   000d97 3676            		ld	(hl),76h
+  1858   000d99 23              		inc	hl
+  1859   000d9a 36ed            		ld	(hl),0edh
+  1860   000d9c 23              		inc	hl
+  1861   000d9d 36a3            		ld	(hl),0a3h
+  1862   000d9f 23              		inc	hl
+  1863   000da0 3620            		ld	(hl),20h
+  1864   000da2 23              		inc	hl
+  1865   000da3 36fb            		ld	(hl),0fbh
+  1866   000da5 23              		inc	hl
+  1867   000da6 10ef            		djnz	ASMPC + 2 - 17		; (-11h)
+  1868   000da8 3ec9            		ld	a,0c9h
+  1869   000daa 77              		ld	(hl),a
+  1870   000dab 326600          		ld	(0066h),a
+  1871   000dae 23              		inc	hl
+  1872   000daf 22c3ff          		ld	(0ffc3h),hl
+  1873   000db2 af              		xor	a
+  1874   000db3 322dff          		ld	(0ff2dh),a
+  1875   000db6 b7              		or	a
+  1876   000db7 2805            		jr	z,ASMPC + 2 + 5		; (+05h)
+  1877   000db9 3e4b            		ld	a,4bh
+  1878   000dbb cd6bf3          		call	0f36bh
+  1879   000dbe dd2ab6ff        		ld	ix,(0ffb6h)
+  1880   000dc2 fd2ab8ff        		ld	iy,(0ffb8h)
+  1881   000dc6 3abdff          		ld	a,(0ffbdh)
+  1882   000dc9 1f              		rra
+  1883   000dca 3a2fff          		ld	a,(0ff2fh)
+  1884   000dcd 3007            		jr	nc,ASMPC + 2 + 7		; (+07h)
+  1885   000dcf ee20            		xor	20h
+  1886   000dd1 322fff          		ld	(0ff2fh),a
+  1887   000dd4 d330            		out	(30h),a
+  1888   000dd6 cda4fd          		call	0fda4h
+  1889   000dd9 3a2dff          		ld	a,(0ff2dh)
+  1890   000ddc d341            		out	(41h),a
+  1891   000dde 2ac3ff          		ld	hl,(0ffc3h)
+  1892   000de1 f3              		di
+  1893   000de2 3ef4            		ld	a,0f4h
+  1894   000de4 cd89f3          		call	0f389h
+  1895   000de7 3abbff          		ld	a,(0ffbbh)
+  1896   000dea 47              		ld	b,a
+  1897   000deb 0e43            		ld	c,43h
+  1898   000ded cd00c3          		call	0c300h
+  1899   000df0 fb              		ei
+  1900   000df1 db40            		in	a,(40h)
+  1901   000df3 cb47            		bit	0,a
+  1902   000df5 20fa            		jr	nz,ASMPC + 2 - 6		; (-06h)
+  1903   000df7 ed5bbfff        		ld	de,(0ffbfh)
+  1904   000dfb 2ac1ff          		ld	hl,(0ffc1h)
+  1905   000dfe 3abaff          		ld	a,(0ffbah)
+  1906   000e01 47              		ld	b,a
+  1907   000e02 dd2ab8ff        		ld	ix,(0ffb8h)
+  1908   000e06 dd7e00          		ld	a,(ix+00h)
+  1909   000e09 dd23            		inc	ix
+  1910   000e0b d342            		out	(42h),a
+  1911   000e0d 3a2fff          		ld	a,(0ff2fh)
+  1912   000e10 e620            		and	20h
+  1913   000e12 3e88            		ld	a,88h
+  1914   000e14 2802            		jr	z,ASMPC + 2 + 2		; (+02h)
+  1915   000e16 cbcf            		set	1,a
+  1916   000e18 cd62f3          		call	0f362h
+  1917   000e1b e698            		and	98h
+  1918   000e1d 2814            		jr	z,ASMPC + 2 + 20		; (+14h)
+  1919   000e1f e680            		and	80h
+  1920   000e21 2036            		jr	nz,ASMPC + 2 + 54		; (+36h)
+  1921   000e23 e5              		push	hl
+  1922   000e24 c5              		push	bc
+  1923   000e25 01fdc2          		ld	bc,0c2fdh
+  1924   000e28 b7              		or	a
+  1925   000e29 ed42            		sbc	hl,bc
+  1926   000e2b c1              		pop	bc
+  1927   000e2c e1              		pop	hl
+  1928   000e2d 3004            		jr	nc,ASMPC + 2 + 4		; (+04h)
+  1929   000e2f 73              		ld	(hl),e
+  1930   000e30 23              		inc	hl
+  1931   000e31 72              		ld	(hl),d
+  1932   000e32 23              		inc	hl
+  1933   000e33 13              		inc	de
+  1934   000e34 10d0            		djnz	ASMPC + 2 - 48		; (-30h)
+  1935   000e36 ed53bfff        		ld	(0ffbfh),de
+  1936   000e3a 22c1ff          		ld	(0ffc1h),hl
+  1937   000e3d 3a2fff          		ld	a,(0ff2fh)
+  1938   000e40 e620            		and	20h
+  1939   000e42 c2fffc          		jp	nz,0fcffh
+  1940   000e45 3a2dff          		ld	a,(0ff2dh)
+  1941   000e48 3c              		inc	a
+  1942   000e49 21beff          		ld	hl,0ffbeh
+  1943   000e4c be              		cp	(hl)
+  1944   000e4d daf4fc          		jp	c,0fcf4h
+  1945   000e50 2ac1ff          		ld	hl,(0ffc1h)
+  1946   000e53 36ff            		ld	(hl),0ffh
+  1947   000e55 23              		inc	hl
+  1948   000e56 36ff            		ld	(hl),0ffh
+  1949   000e58 af              		xor	a
+  1950   000e59 f5              		push	af
+  1951   000e5a 3eff            		ld	a,0ffh
+  1952   000e5c 322dff          		ld	(0ff2dh),a
+  1953   000e5f d341            		out	(41h),a
+  1954   000e61 f1              		pop	af
+  1955   000e62 c9              		ret
+  1956                          
+  1957   000e63 3abaff          		ld	a,(0ffbah)
+  1958   000e66 4f              		ld	c,a
+  1959   000e67 dde5            		push	ix
+  1960   000e69 e1              		pop	hl
+  1961   000e6a 46              		ld	b,(hl)
+  1962   000e6b 23              		inc	hl
+  1963   000e6c ed5bc3ff        		ld	de,(0ffc3h)
+  1964   000e70 cd0bfe          		call	0fe0bh
+  1965   000e73 10fb            		djnz	ASMPC + 2 - 5		; (-05h)
+  1966   000e75 46              		ld	b,(hl)
+  1967   000e76 23              		inc	hl
+  1968   000e77 e5              		push	hl
+  1969   000e78 dde1            		pop	ix
+  1970   000e7a 3a2dff          		ld	a,(0ff2dh)
+  1971   000e7d dd7707          		ld	(ix+07h),a
+  1972   000e80 3a2fff          		ld	a,(0ff2fh)
+  1973   000e83 e620            		and	20h
+  1974   000e85 3e00            		ld	a,00h
+  1975   000e87 2801            		jr	z,ASMPC + 2 + 1		; (+01h)
+  1976   000e89 3c              		inc	a
+  1977   000e8a dd7709          		ld	(ix+09h),a
+  1978   000e8d fd7e00          		ld	a,(iy+00h)
+  1979   000e90 fd23            		inc	iy
+  1980   000e92 dd770b          		ld	(ix+0bh),a
+  1981   000e95 dde5            		push	ix
+  1982   000e97 e1              		pop	hl
+  1983   000e98 c5              		push	bc
+  1984   000e99 cd0bfe          		call	0fe0bh
+  1985   000e9c 10fb            		djnz	ASMPC + 2 - 5		; (-05h)
+  1986   000e9e dd7e0d          		ld	a,(ix+0dh)
+  1987   000ea1 cdcdfa          		call	0facdh
+  1988   000ea4 3eff            		ld	a,0ffh
+  1989   000ea6 12              		ld	(de),a
+  1990   000ea7 13              		inc	de
+  1991   000ea8 0b              		dec	bc
+  1992   000ea9 78              		ld	a,b
+  1993   000eaa b1              		or	c
+  1994   000eab 20f7            		jr	nz,ASMPC + 2 - 9		; (-09h)
+  1995   000ead 46              		ld	b,(hl)
+  1996   000eae 23              		inc	hl
+  1997   000eaf cd0bfe          		call	0fe0bh
+  1998   000eb2 10fb            		djnz	ASMPC + 2 - 5		; (-05h)
+  1999   000eb4 c1              		pop	bc
+  2000   000eb5 0d              		dec	c
+  2001   000eb6 20c2            		jr	nz,ASMPC + 2 - 62		; (-3eh)
+  2002   000eb8 2ac3ff          		ld	hl,(0ffc3h)
+  2003   000ebb 01d827          		ld	bc,27d8h
+  2004   000ebe 09              		add	hl,bc
+  2005   000ebf ed52            		sbc	hl,de
+  2006   000ec1 44              		ld	b,h
+  2007   000ec2 4d              		ld	c,l
+  2008   000ec3 62              		ld	h,d
+  2009   000ec4 6b              		ld	l,e
+  2010   000ec5 13              		inc	de
+  2011   000ec6 77              		ld	(hl),a
+  2012   000ec7 edb0            		ldir
+  2013   000ec9 c9              		ret
+  2014                          
+  2015   000eca c5              		push	bc
+  2016   000ecb 46              		ld	b,(hl)
+  2017   000ecc 23              		inc	hl
+  2018   000ecd 7e              		ld	a,(hl)
+  2019   000ece 23              		inc	hl
+  2020   000ecf 12              		ld	(de),a
+  2021   000ed0 13              		inc	de
+  2022   000ed1 10fc            		djnz	ASMPC + 2 - 4		; (-04h)
+  2023   000ed3 c1              		pop	bc
+  2024   000ed4 c9              		ret
+  2025                          
+  2026   000ed5 0110ff          		ld	bc,0ff10h
+  2027   000ed8 0b              		dec	bc
+  2028   000ed9 03              		inc	bc
+  2029   000eda 00              		nop
+  2030   000edb 03              		inc	bc
+  2031   000edc 00              		nop
+  2032   000edd 01fe01          		ld	bc,01feh
+  2033   000ee0 00              		nop
+  2034   000ee1 010001          		ld	bc,0100h
+  2035   000ee4 00              		nop
+  2036   000ee5 010001          		ld	bc,0100h
+  2037   000ee8 f7              		rst	30h
+  2038   000ee9 0b              		dec	bc
+  2039   000eea ff              		rst	38h
+  2040   000eeb 0600            		ld	b,00h
+  2041   000eed 01fb02          		ld	bc,02fbh
+  2042   000ef0 01f709          		ld	bc,09f7h
+  2043   000ef3 ff              		rst	38h
+  2044   000ef4 01204e          		ld	bc,4e20h
+  2045   000ef7 0c              		inc	c
+  2046   000ef8 0c              		inc	c
+  2047   000ef9 00              		nop
+  2048   000efa 03              		inc	bc
+  2049   000efb f5              		push	af
+  2050   000efc 01fe01          		ld	bc,01feh
+  2051   000eff 00              		nop
+  2052   000f00 010001          		ld	bc,0100h
+  2053   000f03 00              		nop
+  2054   000f04 010101          		ld	bc,0101h
+  2055   000f07 f7              		rst	30h
+  2056   000f08 164e            		ld	d,4eh
+  2057   000f0a 0c              		inc	c
+  2058   000f0b 00              		nop
+  2059   000f0c 03              		inc	bc
+  2060   000f0d f5              		push	af
+  2061   000f0e 01fb02          		ld	bc,02fbh
+  2062   000f11 01f710          		ld	bc,10f7h
+  2063   000f14 4e              		ld	c,(hl)
+  2064   000f15 12              		ld	(de),a
+  2065   000f16 100e            		djnz	ASMPC + 2 + 14		; (+0eh)
+  2066   000f18 0c              		inc	c
+  2067   000f19 0a              		ld	a,(bc)
+  2068   000f1a 08              		ex	af,af'
+  2069   000f1b 0604            		ld	b,04h
+  2070   000f1d 02              		ld	(bc),a
+  2071   000f1e 110f0d          		ld	de,0d0fh
+  2072   000f21 0b              		dec	bc
+  2073   000f22 09              		add	hl,bc
+  2074   000f23 07              		rlca
+  2075   000f24 05              		dec	b
+  2076   000f25 03              		inc	bc
+  2077   000f26 010107          		ld	bc,0701h
+  2078   000f29 0d              		dec	c
+  2079   000f2a 060c            		ld	b,0ch
+  2080   000f2c 12              		ld	(de),a
+  2081   000f2d 05              		dec	b
+  2082   000f2e 0b              		dec	bc
+  2083   000f2f 11040a          		ld	de,0a04h
+  2084   000f32 1003            		djnz	ASMPC + 2 + 3		; (+03h)
+  2085   000f34 09              		add	hl,bc
+  2086   000f35 0f              		rrca
+  2087   000f36 02              		ld	(bc),a
+  2088   000f37 08              		ex	af,af'
+  2089   000f38 0e04            		ld	c,04h
+  2090   000f3a 28ff            		jr	z,ASMPC + 2 - 1		; (-01h)
+  2091   000f3c 0600            		ld	b,00h
+  2092   000f3e 01fc1a          		ld	bc,1afch
+  2093   000f41 ff              		rst	38h
+  2094   000f42 0b              		dec	bc
+  2095   000f43 03              		inc	bc
+  2096   000f44 00              		nop
+  2097   000f45 03              		inc	bc
+  2098   000f46 00              		nop
+  2099   000f47 01fe01          		ld	bc,01feh
+  2100   000f4a 00              		nop
+  2101   000f4b 010001          		ld	bc,0100h
+  2102   000f4e 00              		nop
+  2103   000f4f 010001          		ld	bc,0100h
+  2104   000f52 f7              		rst	30h
+  2105   000f53 0b              		dec	bc
+  2106   000f54 ff              		rst	38h
+  2107   000f55 0600            		ld	b,00h
+  2108   000f57 01fb02          		ld	bc,02fbh
+  2109   000f5a 01f71b          		ld	bc,1bf7h
+  2110   000f5d ff              		rst	38h
+  2111   000f5e 05              		dec	b
+  2112   000f5f 50              		ld	d,b
+  2113   000f60 4e              		ld	c,(hl)
+  2114   000f61 0c              		inc	c
+  2115   000f62 00              		nop
+  2116   000f63 03              		inc	bc
+  2117   000f64 f601            		or	01h
+  2118   000f66 fc324e          		call	m,4e32h
+  2119   000f69 0c              		inc	c
+  2120   000f6a 0c              		inc	c
+  2121   000f6b 00              		nop
+  2122   000f6c 03              		inc	bc
+  2123   000f6d f5              		push	af
+  2124   000f6e 01fe01          		ld	bc,01feh
+  2125   000f71 00              		nop
+  2126   000f72 010001          		ld	bc,0100h
+  2127   000f75 00              		nop
+  2128   000f76 010101          		ld	bc,0101h
+  2129   000f79 f7              		rst	30h
+  2130   000f7a 164e            		ld	d,4eh
+  2131   000f7c 0c              		inc	c
+  2132   000f7d 00              		nop
+  2133   000f7e 03              		inc	bc
+  2134   000f7f f5              		push	af
+  2135   000f80 01fb02          		ld	bc,02fbh
+  2136   000f83 01f735          		ld	bc,35f7h
+  2137   000f86 4e              		ld	c,(hl)
+  2138   000f87 010e03          		ld	bc,030eh
+  2139   000f8a 1005            		djnz	ASMPC + 2 + 5		; (+05h)
+  2140   000f8c 12              		ld	(de),a
+  2141   000f8d 07              		rlca
+  2142   000f8e 14              		inc	d
+  2143   000f8f 09              		add	hl,bc
+  2144   000f90 160b            		ld	d,0bh
+  2145   000f92 180d            		jr	ASMPC + 2 + 13		; (+0dh)
+  2146   000f94 1a              		ld	a,(de)
+  2147   000f95 02              		ld	(bc),a
+  2148   000f96 0f              		rrca
+  2149   000f97 04              		inc	b
+  2150   000f98 110613          		ld	de,1306h
+  2151   000f9b 08              		ex	af,af'
+  2152   000f9c 15              		dec	d
+  2153   000f9d 0a              		ld	a,(bc)
+  2154   000f9e 17              		rla
+  2155   000f9f 0c              		inc	c
+  2156   000fa0 19              		add	hl,de
+  2157   000fa1 011209          		ld	bc,0912h
+  2158   000fa4 1a              		ld	a,(de)
+  2159   000fa5 110819          		ld	de,1908h
+  2160   000fa8 1007            		djnz	ASMPC + 2 + 7		; (+07h)
+  2161   000faa 180f            		jr	ASMPC + 2 + 15		; (+0fh)
+  2162   000fac 0617            		ld	b,17h
+  2163   000fae 0e05            		ld	c,05h
+  2164   000fb0 160d            		ld	d,0dh
+  2165   000fb2 04              		inc	b
+  2166   000fb3 15              		dec	d
+  2167   000fb4 0c              		inc	c
+  2168   000fb5 03              		inc	bc
+  2169   000fb6 14              		inc	d
+  2170   000fb7 0b              		dec	bc
+  2171   000fb8 02              		ld	(bc),a
+  2172   000fb9 13              		inc	de
+  2173   000fba 0a              		ld	a,(bc)
+  2174   000fbb ff              		rst	38h
+  2175   000fbc ff              		rst	38h
+  2176   000fbd ff              		rst	38h
+  2177   000fbe ff              		rst	38h
+  2178   000fbf 00              		nop
+  2179   000fc0 00              		nop
+  2180   000fc1 00              		nop
+  2181   000fc2 00              		nop
+  2182   000fc3 1010            		djnz	ASMPC + 2 + 16		; (+10h)
+  2183   000fc5 1010            		djnz	ASMPC + 2 + 16		; (+10h)
+  2184   000fc7 00              		nop
+  2185   000fc8 ff              		rst	38h
+  2186   000fc9 010000          		ld	bc,0000h
+  2187   000fcc 00              		nop
+  2188   000fcd 320a00          		ld	(000ah),a
+  2189   000fd0 00              		nop
+  2190   000fd1 00              		nop
+  2191   000fd2 00              		nop
+  2192   000fd3 21f8be          		ld	hl,0bef8h
+  2193   000fd6 f7              		rst	30h
+  2194   000fd7 e1              		pop	hl
+  2195   000fd8 f7              		rst	30h
+  2196   000fd9 02              		ld	(bc),a
+  2197   000fda 0d              		dec	c
+  2198   000fdb 0a              		ld	a,(bc)
+  2199   000fdc 00              		nop
+  2200   000fdd 00              		nop
+  2201   000fde 00              		nop
+  2202   000fdf 00              		nop
+  2203   000fe0 3c              		inc	a
+  2204   000fe1 00              		nop
+  2205   000fe2 80              		add	a,b
+  2206   000fe3 00              		nop
+  2207   000fe4 b7              		or	a
+  2208   000fe5 fb              		ei
+  2209   000fe6 00              		nop
+  2210   000fe7 c5              		push	bc
+  2211   000fe8 ff              		rst	38h
+  2212   000fe9 0f              		rrca
+  2213   000fea 73              		ld	(hl),e
+  2214   000feb 00              		nop
+  2215   000fec 00              		nop
+  2216   000fed 00              		nop
+  2217   000fee 00              		nop
+  2218   000fef 00              		nop
+  2219   000ff0 00              		nop
+  2220   000ff1 00              		nop
+  2221   000ff2 00              		nop
+  2222   000ff3 00              		nop
+  2223   000ff4 00              		nop
+  2224   000ff5 00              		nop
+  2225   000ff6 53              		ld	d,e
+  2226   000ff7 41              		ld	b,c
+  2227   000ff8 4c              		ld	c,h
+  2228   000ff9 4c              		ld	c,h
+  2229   000ffa 59              		ld	e,c
+  2230   000ffb 2031            		jr	nz,ASMPC + 2 + 49		; (+31h)
+  2231   000ffd 2052            		jr	nz,ASMPC + 2 + 82		; (+52h)
+  2232   000fff 65              		ld	h,l
+  2233   001000 76              		halt
+  2234   001001 2031            		jr	nz,ASMPC + 2 + 49		; (+31h)
+  2235   001003 2e30            		ld	l,30h
+  2236                          ;		ld	sp,0000h
+  2237   001005 31              		db	031h
+  2238                          
+z80.asm:
+   244                          		include	"sallytest.asm"
+sallytest.asm:
+     1                          conout		equ	chrout
+     2                          conin		equ	chrin
+     3                          
+     4                          ;--------------------------------------------------------------
+     5                          ; print menu
+     6                          ; print prompt
+     7                          ; read upper key
+     8                          ; check if key is found in menukey
+     9                          ; read jmp-address and jump to subroutine
+    10                          ;--------------------------------------------------------------
+    11                          printmenu:
+    12   001006 3e01            		ld	a, 1
+    13   001008 3203ef          		ld	(VARS + echo), a
+    14   00100b dd2100ef        		ld	ix, VARS
+    15                          
+    16   00100f 214c13          		ld      HL, menutext
+    17   001012 cdbb11          		call	printstr
+    18                          
+    19                          printprompt:
+    20   001015 cdfd11          		call	newline
+    21   001018 0e3e            		ld	c, '>'
+    22   00101a cdd111          		call	printaddr
+    23                          
+    24                          enterkey:
+    25   00101d 0e00            		ld	c, 0			;offset in jumptable
+    26   00101f 213613          		ld	HL, menukey		;number auf keys
+    27   001022 46              		ld	b, (HL)			;in b
+    28   001023 23              		inc	HL
+    29   001024 cd0f12          		call	getupper		;read upper key
+    30                          enterkey2:
+    31   001027 be              		cp	(HL)			;key found?
+    32   001028 2807            		jr	Z, enterkey1		;yes ==>
+    33   00102a 23              		inc	HL
+    34   00102b 0c              		inc	c
+    35   00102c 0c              		inc	c
+    36   00102d 10f8            		djnz	enterkey2		;decrease b and jump
+    37   00102f 18ec            		jr	enterkey
+    38                          enterkey1:
+    39   001031 0600            		ld	b, 0			;add offset in BC
+    40   001033 213e13          		ld	HL, menutab		;to base
+    41   001036 09              		add	HL, BC
+    42   001037 011510          		ld	BC, printprompt		;push return-address
+    43   00103a c5              		push	BC
+    44   00103b 5e              		ld	e, (HL)			;load jp address in DE
+    45   00103c 23              		inc	HL
+    46   00103d 56              		ld	d, (HL)
+    47   00103e eb              		ex	DE, HL			;in HL now
+    48   00103f e9              		jp	(HL)
+    49                          
+    50                          ;--------------------------------------------------------------
+    51                          ; jump to printmenu
+    52                          ;--------------------------------------------------------------
+    53                          questionmark:
+    54   001040 c1              		pop	BC
+    55   001041 c30610          		jp	printmenu
+    56                          
+    57                          ;--------------------------------------------------------------
+    58                          ; jump to (addr)
+    59                          ;--------------------------------------------------------------
+    60   001044 2a01ef          goto:		ld	HL, (VARS + addr)
+    61   001047 e9              		jp	(HL)
+    62                          
+    63                          ;--------------------------------------------------------------
+    64                          ; Disassemble 22 lines starting from (addr)
+    65                          ;--------------------------------------------------------------
+    66                          disass:
+    67   001048 0616            		ld	B, 22
+    68   00104a ed5b01ef        		ld	DE, (VARS + addr)
+    69   00104e cdfd11          		call	newline
+    70                          disass1:
+    71   001051 c5              		push	BC
+    72   001052 cd5e14          		call	DISASM
+    73   001055 cdfd11          		call	newline
+    74   001058 c1              		pop	BC
+    75   001059 10f6            		djnz	disass1
+    76                          
+    77   00105b ed5301ef        		ld	(VARS + addr), DE	;save new address
+    78   00105f c9              		ret
+    79                          
+    80                          ;--------------------------------------------------------------
+    81                          ; change a byte in (addr)
+    82                          ;--------------------------------------------------------------
+    83                          changebyte:
+    84   001060 2a01ef          		ld	HL, (VARS + addr)
+    85   001063 7e              		ld	a, (HL)
+    86   001064 cde111          		call	printhex
+    87   001067 3e3a            		ld	a, ':'
+    88   001069 cd5311          		call	conout
+    89   00106c cd8811          		call	gethexbyte
+    90   00106f 77              		ld	(HL), a
+    91   001070 c9              		ret
+    92                          
+    93                          ;--------------------------------------------------------------
+    94                          ;
+    95                          ;--------------------------------------------------------------
+    96                          fillmem:
+    97   001071 210013          		ld	HL, filltext
+    98   001074 cdbb11          		call	printstr
+    99                          
+   100   001077 cd8811          		call	gethexbyte		;get from-addr
+   101   00107a 67              		ld	h, a
+   102   00107b cd8811          		call	gethexbyte
+   103   00107e 6f              		ld	l, a
+   104   00107f e5              		push	HL
+   105   001080 e5              		push	HL
+   106                          
+   107   001081 21f512          		ld	HL, lentext
+   108   001084 cdbb11          		call	printstr
+   109   001087 cd8811          		call	gethexbyte		;get length
+   110   00108a 47              		ld	b, a
+   111   00108b cd8811          		call	gethexbyte
+   112   00108e 4f              		ld	c, a
+   113                          
+   114   00108f 78              		ld	a, b			; if BC = 0
+   115   001090 b1              		or	a, c
+   116   001091 c8              		ret	Z			; return
+   117   001092 0b              		dec	BC
+   118                          
+   119   001093 210b13          		ld	HL, withtext
+   120   001096 cdbb11          		call	printstr
+   121   001099 cd8811          		call	gethexbyte
+   122                          
+   123   00109c d1              		pop	DE			; DE = HL + 1
+   124   00109d 13              		inc	DE
+   125                          
+   126   00109e e1              		pop	HL
+   127   00109f 77              		ld	(HL), a
+   128                          
+   129   0010a0 78              		ld	a, b
+   130   0010a1 b1              		or	a, c
+   131   0010a2 c8              		ret	Z
+   132                          
+   133   0010a3 edb0            		LDIR
+   134                          
+   135   0010a5 c9              		ret
+   136                          
+   137                          ;--------------------------------------------------------------
+   138                          ;
+   139                          ;--------------------------------------------------------------
+   140                          transfer:
+   141   0010a6 21e612          		ld	HL, transtext
+   142   0010a9 cdbb11          		call	printstr
+   143                          
+   144   0010ac cd8811          		call	gethexbyte		;get from-addr
+   145   0010af 67              		ld	h, a
+   146   0010b0 cd8811          		call	gethexbyte
+   147   0010b3 6f              		ld	l, a
+   148   0010b4 e5              		push	HL
+   149                          
+   150   0010b5 21f512          		ld	HL, lentext
+   151   0010b8 cdbb11          		call	printstr
+   152   0010bb cd8811          		call	gethexbyte		;get length
+   153   0010be 47              		ld	b, a
+   154   0010bf cd8811          		call	gethexbyte
+   155   0010c2 4f              		ld	c, a
+   156                          
+   157   0010c3 21fb12          		ld	HL, totext
+   158   0010c6 cdbb11          		call	printstr
+   159   0010c9 cd8811          		call	gethexbyte		;get dest-addr
+   160   0010cc 57              		ld	d, a
+   161   0010cd cd8811          		call	gethexbyte
+   162   0010d0 5f              		ld	e, a
+   163                          
+   164   0010d1 e1              		pop	HL
+   165                          
+   166   0010d2 edb0            		LDIR
+   167                          
+   168   0010d4 c9              		ret
+   169                          
+   170                          ;--------------------------------------------------------------
+   171                          ; read new address from conin
+   172                          ;--------------------------------------------------------------
+   173                          newaddress:
+   174   0010d5 21d612          		ld	HL, addrtext
+   175   0010d8 cdbb11          		call	printstr
+   176   0010db cd8811          		call	gethexbyte
+   177   0010de 3202ef          		ld	(VARS + addr + 1), a
+   178   0010e1 cd8811          		call	gethexbyte
+   179   0010e4 3201ef          		ld	(VARS + addr), a
+   180   0010e7 c9              		ret
+   181                          
+   182                          ;--------------------------------------------------------------
+   183                          ; dump 256 bytes starting from (HL)
+   184                          ;--------------------------------------------------------------
+   185                          dumpmem:
+   186   0010e8 cdfd11          		call	newline
+   187   0010eb 1610            		ld	d, 16
+   188   0010ed 2a01ef          		ld	HL, (VARS + addr)
+   189                          
+   190                          dumpline:
+   191   0010f0 0e3a            		ld	c, ':'
+   192   0010f2 cdd111          		call	printaddr
+   193                          
+   194   0010f5 cd0712          		call	space
+   195   0010f8 e5              		push	HL
+   196                          
+   197   0010f9 0610            		ld	b, 16
+   198                          dumpmem1:
+   199   0010fb 7e              		ld	a, (HL)
+   200   0010fc 23              		inc	HL
+   201   0010fd cde111          		call	printhex
+   202   001100 cd0712          		call	space
+   203   001103 78              		ld	a, b
+   204   001104 fe09            		cp	9
+   205   001106 2003            		jr	NZ, dumpmem3
+   206   001108 cd0712          		call	space
+   207                          dumpmem3:
+   208   00110b 10ee            		djnz	dumpmem1
+   209                          
+   210                          
+   211   00110d 3e7c            		ld	a, '|'
+   212   00110f cd5311          		call	chrout
+   213   001112 0610            		ld	b, 16
+   214   001114 e1              		pop	HL
+   215                          
+   216                          dumpmem5:
+   217   001115 7e              		ld	a, (HL)
+   218   001116 23              		inc	HL
+   219   001117 fe20            		cp	32
+   220   001119 3804            		jr	C, dumpmem6
+   221   00111b fe7e            		cp	126
+   222   00111d 3802            		jr	C, dumpmem4
+   223                          dumpmem6:
+   224   00111f 3e2e            		ld	a, '.'
+   225                          dumpmem4:
+   226                          ;		ld	c, a
+   227   001121 cd5311          		call	chrout
+   228   001124 10ef            		djnz	dumpmem5
+   229                          
+   230   001126 3e7c            		ld	a, '|'
+   231   001128 cd5311          		call	chrout
+   232                          
+   233   00112b cdfd11          		call	newline
+   234   00112e 2201ef          		ld	(VARS + addr), hl
+   235   001131 15              		dec	d
+   236   001132 20bc            		jr	NZ, dumpline
+   237   001134 c9              		ret
+   238                          
+   239                          
+   240                          ;--------------------------------------------------------------
+   241                          ; input char in A
+   242                          ;--------------------------------------------------------------
+   243   001135 db51            chrin:		in	a, (TXD)
+   244   001137 cb5f            		bit	3, a
+   245   001139 20fa            		jr	nz, chrin		;wait for start bit
+   246   00113b c5              		push	bc
+   247   00113c d5              		push	de
+   248   00113d 0608            		ld	b, 8
+   249   00113f cd7111          		call	t19200h
+   250   001142 cd7511          chrin1:		call	t19200
+   251   001145 db51            		in	a, (TXD)
+   252   001147 1f              		rra
+   253   001148 1f              		rra
+   254   001149 1f              		rra
+   255   00114a 1f              		rra
+   256   00114b cb1a            		rr	d
+   257   00114d 10f3            		djnz	chrin1
+   258   00114f 7a              		ld	a, d
+   259   001150 d1              		pop	de
+   260   001151 c1              		pop	bc
+   261   001152 c9              		ret
+   262                          
+   263                          ;--------------------------------------------------------------
+   264                          ; output char in A
+   265                          ;--------------------------------------------------------------
+   266   001153 c5              chrout:		push	bc			;4.000.000 / 19200 = 208
+   267   001154 f5              		push	af
+   268   001155 f5              		push	af
+   269   001156 af              		xor	a			;208 - 77 = 131
+   270   001157 0608            		ld	b, 8
+   271   001159 d351            		out	(TXD), a		;send start bit
+   272   00115b cd7511          		call	t19200
+   273   00115e f1              		pop	af
+   274   00115f d351            chrout1:	out	(TXD), a		;11
+   275   001161 0f              		rrca				;4
+   276   001162 cd7511          		call	t19200			;17
+   277   001165 10f8            		djnz	chrout1			;12
+   278   001167 3e01            		ld	a, 1			;stop bit
+   279   001169 d351            		out	(TXD), a
+   280   00116b cd7511          		call	t19200
+   281   00116e f1              		pop	af
+   282   00116f c1              		pop	bc
+   283   001170 c9              		ret
+   284                          
+   285   001171 0e01            t19200h:	ld	c, 1
+   286   001173 1802            		jr	t19200a
+   287   001175 0e09            t19200:		ld	c, 9			;7
+   288   001177 0d              t19200a:	dec	c			;4
+   289   001178 20fd            		jr	nz, t19200a		;12
+   290   00117a c9              		ret				;10
+   291                          
+   292   00117b f5              time:		push	af
+   293   00117c e5              		push	hl
+   294   00117d 210000          		ld	hl, 0
+   295   001180 2b              time1:		dec	hl
+   296   001181 7c              		ld	a, h
+   297   001182 b5              		or	a, l
+   298   001183 20fb            		jr	nz, time1
+   299   001185 e1              		pop	hl
+   300   001186 f1              		pop	af
+   301   001187 c9              		ret
+   302                          
+   303                          
+   304                          ;--------------------------------------------------------------
+   305                          ; gethexbyte
+   306                          ; returns 00-FF in A
+   307                          ; uses E
+   308                          ;--------------------------------------------------------------
+   309                          gethexbyte:
+   310   001188 d5              		push	DE
+   311   001189 cd9f11          		call	getnibble
+   312   00118c 07              		rlca
+   313   00118d 07              		rlca
+   314   00118e 07              		rlca
+   315   00118f 07              		rlca
+   316   001190 5f              		ld	e, a
+   317   001191 cd9f11          		call	getnibble
+   318   001194 b3              		or	e
+   319   001195 5f              		ld	e, a
+   320   001196 dd8600          		add	a, (IX + sum)
+   321   001199 3200ef          		ld	(VARS + sum), a
+   322   00119c 7b              		ld	a, e
+   323   00119d d1              		pop	DE
+   324   00119e c9              		ret
+   325                          
+   326                          
+   327                          ;--------------------------------------------------------------
+   328                          ; calls conin
+   329                          ; returns 0-F in A
+   330                          ;--------------------------------------------------------------
+   331                          getnibble:
+   332   00119f cd3511          		call	conin
+   333   0011a2 f5              		push	AF
+   334   0011a3 3a03ef          		ld	a, (VARS + echo)
+   335   0011a6 b7              		or	a
+   336   0011a7 2807            		jr	Z, getnibble2
+   337   0011a9 f1              		pop	AF
+   338   0011aa f5              		push	AF
+   339   0011ab c5              		push	BC
+   340                          ;		ld	c, a
+   341   0011ac cd5311          		call	conout
+   342   0011af c1              		pop	BC
+   343                          getnibble2:
+   344   0011b0 f1              		pop	AF
+   345   0011b1 d630            		sub	'0'
+   346   0011b3 fe0a            		cp	10		; < 10 ?
+   347   0011b5 d8              		ret	C		; yes, return
+   348   0011b6 e6df            		and	11011111b	; make uppercase
+   349   0011b8 d607            		sub	7
+   350   0011ba c9              		ret
+   351                          
+   352                          ;--------------------------------------------------------------
+   353                          ; print text in (HL) uses
+   354                          ; A
+   355                          ;--------------------------------------------------------------
+   356                          printstr:
+   357   0011bb c5              		push	BC
+   358                          printstr2:
+   359   0011bc 7e              		ld	a, (HL)
+   360   0011bd 23              		inc	HL
+   361   0011be b7              		or	a
+   362   0011bf 280e            		jr	Z, printstr1
+   363   0011c1 cd5311          		call	chrout
+   364   0011c4 fe0d            		cp	CR
+   365   0011c6 20f4            		jr	NZ, printstr2
+   366   0011c8 3e0a            		ld	a, LF
+   367   0011ca cd5311          		call	chrout
+   368   0011cd 18ed            		jr	printstr2
+   369                          printstr1:
+   370   0011cf c1              		pop	BC
+   371   0011d0 c9              		ret
+   372                          
+   373                          ;--------------------------------------------------------------
+   374                          ;
+   375                          ;--------------------------------------------------------------
+   376                          printaddr:
+   377   0011d1 3a02ef          		ld	a, (VARS + addr + 1)
+   378   0011d4 cde111          		call	printhex
+   379   0011d7 3a01ef          		ld	a, (VARS + addr)
+   380   0011da cde111          		call	printhex
+   381   0011dd 79              		ld	a, c
+   382   0011de c35311          		jp	conout
+   383                          ;--------------------------------------------------------------
+   384                          ; prints byte in A in hexadecimal format
+   385                          ;--------------------------------------------------------------
+   386                          printhex:
+   387   0011e1 f5              		push    AF
+   388   0011e2 f5              		push    AF
+   389   0011e3 1f              		rra
+   390   0011e4 1f              		rra
+   391   0011e5 1f              		rra
+   392   0011e6 1f              		rra
+   393   0011e7 cdf011          		call    printnib
+   394   0011ea f1              		pop     AF
+   395   0011eb cdf011          		call    printnib
+   396   0011ee f1              		pop     AF
+   397   0011ef c9              		ret
+   398                          printnib:
+   399   0011f0 e60f            		and     0fh
+   400   0011f2 fe0a            		cp      0ah
+   401   0011f4 3802            		jr      C, printnib1
+   402   0011f6 c607            		add     a, 07h
+   403                          printnib1:
+   404   0011f8 c630            		add     a, '0'
+   405                          print:
+   406   0011fa c35311          		jp    chrout
+   407                          
+   408                          newline:
+   409   0011fd 3e0d            		ld      a, CR
+   410   0011ff cd5311          		call    chrout
+   411   001202 3e0a            		ld      a, LF
+   412   001204 c35311          		jp    	chrout
+   413                          
+   414                          space:
+   415   001207 f5              		push	af
+   416   001208 3e20            		ld	a, ' '
+   417   00120a cd5311          		call	chrout
+   418   00120d f1              		pop	af
+   419   00120e c9              		ret
+   420                          
+   421                          getupper:
+   422   00120f cd3511          		call	conin
+   423   001212 fe61            		cp	'a'
+   424   001214 d8              		ret	C
+   425   001215 d620            		sub	32
+   426   001217 c9              		ret
+   427                          
+   428   001218 201b5b6d0d      sallystart:	DB	32, 27, "[m", CR
+   429   00121d 2a2a2a2a2a2a2a2a		DB	"*************************************************", CR
+                2a2a2a2a2a2a2a2a
+                2a2a2a2a2a2a2a2a
+                2a2a2a2a2a2a2a2a
+                2a2a2a2a2a2a2a2a
+                2a2a2a2a2a2a2a2a
+                2a0d            
+   430   00124f 2a2a2a20201b5b31		DB	"***  ", 27, "[1mSally-1", 27, "[m     Start                        ***", CR
+                6d53616c6c792d31
+                1b5b6d2020202020
+                5374617274202020
+                2020202020202020
+                2020202020202020
+                20202020202a2a2a
+                0d              
+   431   001288 2a2a2a2a2a2a2a2a		DB	"*************************************************", CR
+                2a2a2a2a2a2a2a2a
+                2a2a2a2a2a2a2a2a
+                2a2a2a2a2a2a2a2a
+                2a2a2a2a2a2a2a2a
+                2a2a2a2a2a2a2a2a
+                2a0d            
+   432   0012ba 00              		DB	0
+   433                          
+   434   0012bb 646f776e6c6f6164downtext:	DB	"downloading...", CR, 0
+                696e672e2e2e0d00
+   435   0012cb 66696e6973686564downendtext:	DB	"finished.", CR, 0
+                2e0d00          
+   436   0012d6 616464726573733aaddrtext:	DB	"address:", 0
+                00              
+   437   0012df 6572726f722100  errortext:	DB	"error!", 0
+   438   0012e6 7472616e73666572transtext:	DB	"transfer from:", 0
+                2066726f6d3a00  
+   439   0012f5 206c656e3a00    lentext:	DB	" len:", 0
+   440   0012fb 20746f3a00      totext:		DB	" to:", 0
+   441   001300 66696c6c2066726ffilltext:	DB	"fill from:", 0
+                6d3a00          
+   442   00130b 20776974683a00  withtext:	DB	" with:", 0
+   443   001312 656e746572206469disktext:	DB	"enter disk number (0-9):",0
+                736b206e756d6265
+                722028302d39293a
+                00              
+   444   00132b 0d66696c656e616dfiletext:	DB	CR, "filename:",0
+                653a00          
+   445                          menukey:
+   446   001336 07              		DB	7
+   447   001337 3f4346474c4d4e  		DB	"?CFGLMN"
+   448                          
+   449                          menutab:
+   450   00133e 4010            		DW	questionmark
+   451   001340 6010            		DW	changebyte
+   452                          ;		DW	download
+   453                          ;		DW	closedisk
+   454   001342 7110            		DW	fillmem
+   455   001344 4410            		DW	goto
+   456   001346 4810            		DW	disass
+   457   001348 e810            		DW	dumpmem
+   458   00134a d510            		DW	newaddress
+   459                          ;		DW	opendisk
+   460                          ;		DW	cpm
+   461                          ;		DW	transfer
+   462                          ;		DW	vt102
+   463                          ;		DW	exit
+   464                          menutext:
+   465   00134c 201b5b6d0d      		DB	32, 27, "[m", CR
+   466   001351 2a2a2a2a2a2a2a2a		DB	"*************************************************", CR
+                2a2a2a2a2a2a2a2a
+                2a2a2a2a2a2a2a2a
+                2a2a2a2a2a2a2a2a
+                2a2a2a2a2a2a2a2a
+                2a2a2a2a2a2a2a2a
+                2a0d            
+   467   001383 2a2a2a20205a3830		DB	"***  Z80 Mini-Monitor  (c) '22  by ", 27, "[1mR. Scholz", 27,"[m  ***", CR
+                204d696e692d4d6f
+                6e69746f72202028
+                6329202732322020
+                6279201b5b316d52
+                2e205363686f6c7a
+                1b5b6d20202a2a2a
+                0d              
+   468   0013bc 2a2a2a2a2a2a2a2a		DB	"*************************************************", CR
+                2a2a2a2a2a2a2a2a
+                2a2a2a2a2a2a2a2a
+                2a2a2a2a2a2a2a2a
+                2a2a2a2a2a2a2a2a
+                2a2a2a2a2a2a2a2a
+                2a0d            
+   469   0013ee 3f202d2054686973		DB	"? - This text", CR
+                20746578740d    
+   470   0013fc 43202d204368616e		DB	"C - Change byte", CR
+                676520627974650d
+   471                          ;		DB	"D - Download Intel Hex file", CR
+   472                          ;		DB	"E - Close Disk", CR
+   473   00140c 46202d2046696c6c		DB	"F - Fill memory", CR
+                206d656d6f72790d
+   474   00141c 47202d20476f746f		DB	"G - Goto address", CR
+                2061646472657373
+                0d              
+   475   00142d 4c202d2044697361		DB	"L - Disassemble", CR
+                7373656d626c650d
+   476   00143d 4d202d204d656d6f		DB	"M - Memory dump", CR
+                72792064756d700d
+   477   00144d 4e202d204e657720		DB	"N - New address", CR
+                616464726573730d
+   478                          ;		DB	"O - Open Disk", CR
+   479                          ;		DB	"P - CP/M", CR
+   480                          ;		DB	"T - Transfer memory", CR
+   481                          ;		DB	"V - VT102 test", CR
+   482                          ;		DB	"X - eXit", CR
+   483   00145d 00              		DB	0
+   484                          
+   485                          		include "C:\github\FABIAN\src\disz80.asm"
+C:/github/FABIAN/src/disz80.asm:
+     1                          
+     2                          
+     3                          ;	SECTION	code_clib
+     4                          ;	PUBLIC	disz80
+     5                          ;	PUBLIC	_disz80
+     6                          ;	EXTERN	fputc_cons
+     7                          
+     8                          ;fputc_cons	equ	conout
+     9                          
+    10                          ;  This code is been found in a ZX Spectrum tool called UTILITY3 v1.3
+    11                          
+    12                          
+    13                          ;.disz80
+    14                          ;._disz80
+    15                          ;	pop	hl
+    16                          ;	pop	bc
+    17                          ;	pop	de
+    18                          ;	push	de
+    19                          ;	push	bc
+    20                          ;	push	hl
+    21                          ;	push	ix	;save callers ix
+    22                          ;
+    23                          ;	ld	a,d	;Supplying -1 as the address means we disassemble the following opcode
+    24                          ;	and	e
+    25                          ;	inc	a
+    26                          ;	jr	nz,dizloop
+    27                          ;	ld	hl,2
+    28                          ;	add	hl,sp
+    29                          ;	ld	e,(hl)
+    30                          ;	inc	hl
+    31                          ;	ld	d,(hl)
+    32                          ;
+    33                          ;.dizloop
+    34                          ;	push	bc
+    35                          ;	call	DISASM
+    36                          ;	pop	bc
+    37                          ;	ld	a,13
+    38                          ;	call	CHROP
+    39                          ;	ld	a,10
+    40                          ;	call	CHROP
+    41                          ;	dec	bc
+    42                          ;	ld	a,b
+    43                          ;	or	c
+    44                          ;	jr	nz,dizloop
+    45                          ;	ld	h,d	;Address of next instruction
+    46                          ;	ld	l,e
+    47                          ;	pop	ix	;restore callers ix
+    48                          ;	ret
+    49                          
+    50                          ; ====================
+    51                          ; DIS-Z80 was published in the SUBSET column of Personal Computer World 1987.
+    52                          ; The routine disassembles a single Z80 instruction at address DE.
+    53                          ; It is required to be followed by a routine called CHROP that outputs a
+    54                          ; single ASCII character.
+    55                          ; It was originally developed for CP/M on an Amstrad CPC128.
+    56                          
+    57                          ; The original ORG was $0100. I have added $5000 to all addresses.
+    58                          ; The stated aim was to write a Z80 disassembly routine in as short a space
+    59                          ; as possible and, at just over 1K (1090 bytes), it is a rather incredible
+    60                          ; program.
+    61                          
+    62                          ; The SUBSET editor David Barrow was able to trim only one byte from John
+    63                          ; Kerr's compact code. I've forgotten where so there's a challenge.
+    64                          ; ====================
+    65                          
+    66   00145e cd8518          .DISASM	CALL 	ADRSP
+    67   001461 010009                 	LD 	BC,$0900
+    68   001464 212020                 	LD 	HL,$2020
+    69                          
+    70   001467 e5              .BUFFER	PUSH 	HL
+    71   001468 10fd                   	DJNZ 	BUFFER
+    72   00146a 60                     	LD 	H,B
+    73   00146b 69                     	LD 	L,C
+    74   00146c 39                     	ADD 	HL,SP
+    75                          
+    76   00146d c5                     	PUSH 	BC
+    77   00146e dde3                   	EX 	(SP),IX
+    78   001470 c5                     	PUSH 	BC
+    79   001471 c5                     	PUSH 	BC
+    80   001472 dd39                   	ADD 	IX,SP
+    81                          
+    82   001474 e5                     	PUSH 	HL
+    83   001475 21ef15                 	LD 	HL,GROUP3
+    84                          
+    85   001478 cd7a18          .TRYNDX	CALL 	FETCH
+    86                          
+    87   00147b 41                     	LD 	B,C
+    88   00147c feed                   	CP 	$ED
+    89   00147e 280a                   	JR 	Z,CONFLG
+    90                          
+    91   001480 04                     	INC 	B
+    92   001481 fedd                   	CP 	$DD
+    93   001483 2805                   	JR 	Z,CONFLG
+    94                          
+    95   001485 04                     	INC 	B
+    96   001486 fefd                   	CP 	$FD
+    97   001488 2008                   	JR 	NZ,NOTNDX
+    98                          
+    99   00148a dd7001          .CONFLG	LD 	(IX+1),B
+   100   00148d 04                     	INC 	B
+   101   00148e 10e8                   	DJNZ 	TRYNDX
+   102                          
+   103   001490 182a                   	JR 	NXBYTE
+   104                          
+   105   001492 4f              .NOTNDX	LD 	C,A
+   106   001493 dd7e01                 	LD 	A,(IX+1)
+   107   001496 b7                     	OR 	A
+   108   001497 2818                   	JR 	Z,NODISP
+   109                          
+   110   001499 79                     	LD 	A,C
+   111   00149a fecb                   	CP 	$CB
+   112   00149c 280d                   	JR 	Z,GETDIS
+   113                          
+   114   00149e e644                   	AND 	$44
+   115   0014a0 fe04                   	CP 	4
+   116   0014a2 2807                   	JR 	Z,GETDIS
+   117                          
+   118   0014a4 79                     	LD 	A,C
+   119   0014a5 e6c0                   	AND 	$C0
+   120   0014a7 fe40                   	CP 	$40
+   121   0014a9 2006                   	JR 	NZ,NODISP
+   122                          
+   123   0014ab cd7a18          .GETDIS	CALL 	FETCH
+   124   0014ae dd7702                 	LD 	(IX+2),A
+   125                          
+   126   0014b1 214715          .NODISP	LD 	HL,GROUP1
+   127   0014b4 79                     	LD 	A,C
+   128   0014b5 fecb                   	CP 	$CB
+   129   0014b7 2007                   	JR 	NZ,NEWMSK
+   130                          
+   131   0014b9 212c15                 	LD 	HL,GROUP2
+   132                          
+   133   0014bc cd7a18          .NXBYTE	CALL 	FETCH
+   134   0014bf 4f                     	LD 	C,A
+   135                          
+   136   0014c0 7e              .NEWMSK	LD 	A,(HL)
+   137   0014c1 b7                     	OR 	A
+   138   0014c2 2816                   	JR 	Z,TABEND
+   139                          
+   140   0014c4 a1                     	AND 	C
+   141   0014c5 23                     	INC 	HL
+   142                          
+   143   0014c6 46              .NEWMOD	LD 	B,(HL)
+   144   0014c7 23                     	INC 	HL
+   145   0014c8 04                     	INC 	B
+   146   0014c9 28f5                   	JR 	Z,NEWMSK
+   147                          
+   148   0014cb be              .TRYMAT	CP 	(HL)
+   149   0014cc 23                     	INC 	HL
+   150   0014cd 2807                   	JR 	Z,GETNDX
+   151                          
+   152   0014cf cb7e                   	BIT 	7,(HL)
+   153   0014d1 23                     	INC 	HL
+   154   0014d2 28f7                   	JR 	Z,TRYMAT
+   155                          
+   156   0014d4 18f0                   	JR 	NEWMOD
+   157                          
+   158   0014d6 7e              .GETNDX	LD 	A,(HL)
+   159   0014d7 e67f                   	AND 	$7F
+   160   0014d9 05                     	DEC 	B
+   161                          
+   162   0014da e1              .TABEND	POP 	HL
+   163   0014db d5                     	PUSH 	DE
+   164   0014dc e5                     	PUSH 	HL
+   165                          
+   166   0014dd eb                     	EX 	DE,HL
+   167   0014de 214516                 	LD 	HL,MONICS
+   168   0014e1 cd6518                 	CALL 	XTRACT
+   169                          
+   170   0014e4 e1                     	POP 	HL
+   171   0014e5 110500                 	LD 	DE,5
+   172   0014e8 19                     	ADD 	HL,DE
+   173   0014e9 d1                     	POP 	DE
+   174                          
+   175   0014ea 78                     	LD 	A,B
+   176   0014eb e6f0                   	AND 	$F0
+   177   0014ed 2813                   	JR 	Z,SECOND
+   178                          
+   179   0014ef 1f                     	RRA
+   180   0014f0 1f                     	RRA
+   181   0014f1 1f                     	RRA
+   182   0014f2 1f                     	RRA
+   183   0014f3 c5                     	PUSH 	BC
+   184                          
+   185   0014f4 47                     	LD 	B,A
+   186   0014f5 79                     	LD 	A,C
+   187   0014f6 cd1517                 	CALL 	OPRND1
+   188                          
+   189   0014f9 c1                     	POP 	BC
+   190   0014fa 78                     	LD 	A,B
+   191   0014fb e60f                   	AND 	$0F
+   192   0014fd 280b                   	JR 	Z,OPDONE
+   193                          
+   194   0014ff 362c                   	LD 	(HL),44  		;,
+   195   001501 23                     	INC 	HL
+   196                          
+   197   001502 78              .SECOND	LD 	A,B
+   198   001503 e60f                   	AND 	$0F
+   199                          
+   200   001505 47                     	LD 	B,A
+   201   001506 79                     	LD 	A,C
+   202   001507 c41b17                 	CALL 	NZ,OPRND2
+   203                          
+   204   00150a 3e03            .OPDONE	LD 	A,3
+   205   00150c dd9600                 	SUB 	(IX+0)
+   206                          
+   207   00150f e1                     	POP 	HL
+   208   001510 e1                     	POP 	HL
+   209   001511 dde1                   	POP 	IX
+   210                          
+   211   001513 380c                   	JR 	C,OUTEXT
+   212                          
+   213   001515 3c                     	INC 	A
+   214   001516 47                     	LD 	B,A
+   215   001517 80                     	ADD 	A,B
+   216   001518 80                     	ADD 	A,B
+   217   001519 47                     	LD 	B,A
+   218                          
+   219   00151a 3e20            .SPACES	LD 	A,$20
+   220   00151c cda118                 	CALL 	CHROP
+   221   00151f 10f9                   	DJNZ 	SPACES
+   222                          
+   223   001521 0612            .OUTEXT	LD 	B,18
+   224                          
+   225   001523 3b              .PUTOUT	DEC 	SP
+   226   001524 e1                     	POP 	HL
+   227   001525 7c                     	LD 	A,H
+   228   001526 cda118                 	CALL 	CHROP
+   229   001529 10f8                   	DJNZ 	PUTOUT
+   230                          
+   231   00152b c9                     	RET
+   232                          
+   233                          ;***********************
+   234                          
+   235   00152c c03640          .GROUP2	defb 	$C0,$36,$40
+   236   00152f 04802dc0be      	defb 	$04,$80,$2D,$C0,$BE
+   237   001534 fff8060033      	defb 	$FF,$F8,$06,$00,$33
+   238   001539 0838103518      	defb 	$08,$38,$10,$35,$18
+   239   00153e 3a203f2840      	defb 	$3A,$20,$3F,$28,$40
+   240   001543 300038c1        	defb 	$30,$00,$38,$C1
+   241                          
+   242                          
+   243   001547 ff0000          .GROUP1	defb 	$FF,$00,$00
+   244   00154a 2407320f37      	defb 	$24,$07,$32,$0F,$37
+   245   00154f 17311f3627      	defb 	$17,$31,$1F,$36,$27
+   246   001554 0d2f0b373d      	defb 	$0D,$2F,$0B,$37,$3D
+   247   001559 3f067614c9      	defb 	$3F,$06,$76,$14,$C9
+   248   00155e 30d912f30f      	defb 	$30,$D9,$12,$F3,$0F
+   249   001563 fb9172c602      	defb 	$FB,$91,$72,$C6,$02
+   250   001568 ce01debc02      	defb 	$CE,$01,$DE,$BC,$02
+   251   00156d d642e603ee      	defb 	$D6,$42,$E6,$03,$EE
+   252   001572 43f625fe8c      	defb 	$43,$F6,$25,$FE,$8C
+   253   001577 0408930110      	defb 	$04,$08,$93,$01,$10
+   254   00157c 10189daf22      	defb 	$10,$18,$9D,$AF,$22
+   255   001581 a2fa2aa2a7      	defb 	$A2,$FA,$2A,$A2,$A7
+   256   001586 32a27a3aa2      	defb 	$32,$A2,$7A,$3A,$A2
+   257   00158b 03c31ccd85      	defb 	$03,$C3,$1C,$CD,$85
+   258   001590 97d3aa79db      	defb 	$97,$D3,$AA,$79,$DB
+   259   001595 9b5fe3930e      	defb 	$9B,$5F,$E3,$93,$0E
+   260   00159a e99c05eb93      	defb 	$E9,$9C,$05,$EB,$93
+   261   00159f dff9a2ffc0      	defb 	$DF,$F9,$A2,$FF,$C0
+   262   0015a4 b640a2fff8      	defb 	$B6,$40,$A2,$FF,$F8
+   263   0015a9 7680028801      	defb 	$76,$80,$02,$88,$01
+   264   0015ae 98bc069042      	defb 	$98,$BC,$06,$90,$42
+   265   0015b3 a003a843b0      	defb 	$A0,$03,$A8,$43,$B0
+   266   0015b8 25b88cffc7      	defb 	$25,$B8,$8C,$FF,$C7
+   267   0015bd 0b0416058e      	defb 	$0B,$04,$16,$05,$8E
+   268   0015c2 b206a220c0      	defb 	$B2,$06,$A2,$20,$C0
+   269   0015c7 b023c21cc4      	defb 	$B0,$23,$C2,$1C,$C4
+   270   0015cc 8510c7bbff      	defb 	$85,$10,$C7,$BB,$FF
+   271   0015d1 cfd301a20d      	defb 	$CF,$D3,$01,$A2,$0D
+   272   0015d6 03160b8efd      	defb 	$03,$16,$0B,$8E,$FD
+   273   0015db 098260c12b      	defb 	$09,$82,$60,$C1,$2B
+   274   0015e0 c5acffe721      	defb 	$C5,$AC,$FF,$E7,$21
+   275   0015e5 209dffefe7      	defb 	$20,$9D,$FF,$EF,$E7
+   276   0015ea 02a27e0aa2      	defb 	$02,$A2,$7E,$0A,$A2
+   277                          
+   278                          
+   279   0015ef ff0044          .GROUP3	defb 	$FF,$00,$44
+   280   0015f2 23452f4d2e      	defb 	$23,$45,$2F,$4D,$2E
+   281   0015f7 4e0067396f      	defb 	$4E,$00,$67,$39,$6F
+   282   0015fc 3470007100      	defb 	$34,$70,$00,$71,$00
+   283   001601 a021a10aa2      	defb 	$A0,$21,$A1,$0A,$A2
+   284   001606 1aa329a81f      	defb 	$1A,$A3,$29,$A8,$1F
+   285   00160b a908aa18ab      	defb 	$A9,$08,$AA,$18,$AB
+   286   001610 28b020b109      	defb 	$28,$B0,$20,$B1,$09
+   287   001615 b219b327b8      	defb 	$B2,$19,$B3,$27,$B8
+   288   00161a 1eb907ba17      	defb 	$1E,$B9,$07,$BA,$17
+   289   00161f bba6ffc7b8      	defb 	$BB,$A6,$FF,$C7,$B8
+   290   001624 409b8b41aa      	defb 	$40,$9B,$8B,$41,$AA
+   291   001629 ffcffd423c      	defb 	$FF,$CF,$FD,$42,$3C
+   292   00162e 4a81ad43a2      	defb 	$4A,$81,$AD,$43,$A2
+   293   001633 da4ba2ffe7      	defb 	$DA,$4B,$A2,$FF,$E7
+   294   001638 404695fff7      	defb 	$40,$46,$95,$FF,$F7
+   295   00163d c747a27c57      	defb 	$C7,$47,$A2,$7C,$57
+   296   001642 a2ff00          	defb 	$A2,$FF,$00
+   297                          
+   298                          ;_______________
+   299                          
+   300   001645 bf              .MONICS	defb 	$BF
+   301   001646 4144c3          	defb 	'A','D','C'+$80   	; ADC
+   302   001649 4144c4          	defb 	'A','D','D'+$80   	; ADD
+   303   00164c 414ec4          	defb 	'A','N','D'+$80   	; AND
+   304   00164f 4249d4          	defb 	'B','I','T'+$80   	; BIT
+   305   001652 43414ccc        	defb 	'C','A','L','L'+$80	; CALL
+   306   001656 4343c6          	defb 	'C','C','F'+$80   	; CCF
+   307   001659 435044d2        	defb 	'C','P','D','R'+$80	; CPDR
+   308   00165d 4350c4          	defb 	'C','P','D'+$80   	; CPD
+   309   001660 435049d2        	defb 	'C','P','I','R'+$80	; CPIR
+   310   001664 4350c9          	defb 	'C','P','I'+$80   	; CPI
+   311   001667 4350cc          	defb 	'C','P','L'+$80   	; CPL
+   312   00166a 43d0            	defb 	'C','P'+$80      	; CP
+   313   00166c 4441c1          	defb 	'D','A','A'+$80   	; DAA
+   314   00166f 4445c3          	defb 	'D','E','C'+$80   	; DEC
+   315   001672 44c9            	defb 	'D','I'+$80      	; DI
+   316   001674 444a4eda        	defb 	'D','J','N','Z'+$80	; DJNZ
+   317   001678 45c9            	defb 	'E','I'+$80      	; EI
+   318   00167a 4558d8          	defb 	'E','X','X'+$80   	; EXX
+   319   00167d 45d8            	defb 	'E','X'+$80      	; EX
+   320   00167f 48414cd4        	defb 	'H','A','L','T'+$80	; HALT
+   321   001683 49cd            	defb 	'I','M'+$80      	; IM
+   322   001685 494ec3          	defb 	'I','N','C'+$80   	; INC
+   323   001688 494e44d2        	defb 	'I','N','D','R'+$80	; INDR
+   324   00168c 494ec4          	defb 	'I','N','D'+$80   	; IND
+   325   00168f 494e49d2        	defb 	'I','N','I','R'+$80	; INIR
+   326   001693 494ec9          	defb 	'I','N','I'+$80   	; INI
+   327   001696 49ce            	defb 	'I','N'+$80      	; IN
+   328   001698 4ad0            	defb 	'J','P'+$80      	; JP
+   329   00169a 4ad2            	defb 	'J','R'+$80      	; JR
+   330   00169c 4c4444d2        	defb 	'L','D','D','R'+$80	; LDDR
+   331   0016a0 4c44c4          	defb 	'L','D','D'+$80   	; LDD
+   332   0016a3 4c4449d2        	defb 	'L','D','I','R'+$80	; LDIR
+   333   0016a7 4c44c9          	defb 	'L','D','I'+$80   	; LDI
+   334   0016aa 4cc4            	defb 	'L','D'+$80      	; LD
+   335   0016ac 4e45c7          	defb 	'N','E','G'+$80   	; NEG
+   336   0016af 4e4fd0          	defb 	'N','O','P'+$80   	; NOP
+   337   0016b2 4fd2            	defb 	'O','R'+$80      	; OR
+   338   0016b4 4f5444d2        	defb 	'O','T','D','R'+$80	; OTDR
+   339   0016b8 4f5449d2        	defb 	'O','T','I','R'+$80	; OTIR
+   340   0016bc 4f5554c4        	defb 	'O','U','T','D'+$80	; OUTD
+   341   0016c0 4f5554c9        	defb 	'O','U','T','I'+$80	; OUTI
+   342   0016c4 4f55d4          	defb 	'O','U','T'+$80   	; OUT
+   343   0016c7 504fd0          	defb 	'P','O','P'+$80   	; POP
+   344   0016ca 505553c8        	defb 	'P','U','S','H'+$80	; PUSH
+   345   0016ce 5245d3          	defb 	'R','E','S'+$80   	; RES
+   346   0016d1 524554c9        	defb 	'R','E','T','I'+$80	; RETI
+   347   0016d5 524554ce        	defb 	'R','E','T','N'+$80	; RETN
+   348   0016d9 5245d4          	defb 	'R','E','T'+$80   	; RET
+   349   0016dc 524cc1          	defb 	'R','L','A'+$80   	; RLA
+   350   0016df 524c43c1        	defb 	'R','L','C','A'+$80	; RLCA
+   351   0016e3 524cc3          	defb 	'R','L','C'+$80   	; RLC
+   352   0016e6 524cc4          	defb 	'R','L','D'+$80   	; RLD
+   353   0016e9 52cc            	defb 	'R','L'+$80      	; RL
+   354   0016eb 5252c1          	defb 	'R','R','A'+$80   	; RRA
+   355   0016ee 525243c1        	defb 	'R','R','C','A'+$80	; RA
+   356   0016f2 5252c3          	defb 	'R','R','C'+$80   	; RRC
+   357   0016f5 5252c4          	defb 	'R','R','D'+$80   	; RRD
+   358   0016f8 52d2            	defb 	'R','R'+$80      	; RR
+   359   0016fa 5253d4          	defb 	'R','S','T'+$80   	; RST
+   360   0016fd 5342c3          	defb 	'S','B','C'+$80   	; SBC
+   361   001700 5343c6          	defb 	'S','C','F'+$80   	; SCF
+   362   001703 5345d4          	defb 	'S','E','T'+$80   	; SET
+   363   001706 534cc1          	defb 	'S','L','A'+$80   	; SLA
+   364   001709 5352c1          	defb 	'S','R','A'+$80   	; SRA
+   365   00170c 5352cc          	defb 	'S','R','L'+$80   	; SRL
+   366   00170f 5355c2          	defb 	'S','U','B'+$80   	; SUB
+   367   001712 584fd2          	defb 	'X','O','R'+$80   	; XOR
+   368                          
+   369                          
+   370                          
+   371                          ;*****************
+   372                          
+   373   001715 1012            .OPRND1	DJNZ 	CONDIT
+   374                          
+   375   001717 e638            .RSTADR	AND 	$38
+   376   001719 182a                   	JR 	DA
+   377                          
+   378   00171b 101d            .OPRND2	DJNZ 	DAT8
+   379                          
+   380   00171d cd7a18          .RELADR	CALL 	FETCH
+   381   001720 4f                     	LD 	C,A
+   382   001721 17                     	RLA
+   383   001722 9f                     	SBC 	A,A
+   384   001723 47                     	LD 	B,A
+   385   001724 eb                     	EX 	DE,HL
+   386   001725 e5                     	PUSH 	HL
+   387   001726 09                     	ADD 	HL,BC
+   388   001727 182d                   	JR 	DHL
+   389                          
+   390   001729 1f              .CONDIT	RRA
+   391   00172a 1f                     	RRA
+   392   00172b 1f                     	RRA
+   393   00172c 1013                   	DJNZ 	BITNUM
+   394                          
+   395   00172e cb67                   	BIT 	4,A
+   396   001730 2002                   	JR 	NZ,ABS
+   397                          
+   398   001732 e603                   	AND 	3
+   399                          
+   400   001734 e607            .ABS   	AND 	7
+   401   001736 c614                   	ADD 	A,$14
+   402   001738 1836                   	JR 	PS1
+   403                          
+   404   00173a 100d            .DAT8  	DJNZ 	DAT16
+   405                          
+   406   00173c cd7a18          .D8    	CALL 	FETCH
+   407   00173f 1804                   	JR 	DA
+   408                          
+   409   001741 1027            .BITNUM	DJNZ 	INTMOD
+   410   001743 e607                   	AND 	7
+   411                          
+   412   001745 4f              .DA    	LD 	C,A
+   413   001746 97                     	SUB 	A
+   414   001747 1809                   	JR 	DAC
+   415                          
+   416   001749 1038            .DAT16 	DJNZ 	EXAF
+   417                          
+   418   00174b cd7a18          .D16   	CALL 	FETCH
+   419   00174e 4f                     	LD 	C,A
+   420   00174f cd7a18                 	CALL 	FETCH
+   421                          
+   422   001752 eb              .DAC   	EX 	DE,HL
+   423   001753 e5                     	PUSH 	HL
+   424   001754 67                     	LD 	H,A
+   425   001755 69                     	LD 	L,C
+   426                          
+   427   001756 0ef8            .DHL   	LD 	C,$F8
+   428   001758 e5                     	PUSH 	HL
+   429   001759 cd4518                 	CALL 	CONVHL
+   430   00175c e1                     	POP 	HL
+   431   00175d 010a00                 	LD 	BC,$000A
+   432   001760 b7                     	OR 	A
+   433   001761 ed42                   	SBC 	HL,BC
+   434   001763 e1                     	POP 	HL
+   435   001764 eb                     	EX 	DE,HL
+   436   001765 d8                     	RET 	C
+   437                          
+   438   001766 3648                   	LD 	(HL),'H'
+   439   001768 23                     	INC 	HL
+   440   001769 c9                     	RET
+   441                          
+   442                          
+   443   00176a 1006            .INTMOD	DJNZ 	STKTOP
+   444   00176c e603                   	AND 	3
+   445   00176e c61c                   	ADD 	A,$1C
+   446                          
+   447   001770 1852            .PS1   	JR 	PS3
+   448                          
+   449   001772 0e13            .STKTOP	LD 	C,$13
+   450   001774 05                     	DEC 	B
+   451   001775 284c                   	JR 	Z,PS2
+   452                          
+   453   001777 1042            .REG16P	DJNZ 	COMMON
+   454   001779 1f                     	RRA
+   455   00177a e603                   	AND 	3
+   456   00177c fe03                   	CP 	3
+   457   00177e 2068                   	JR 	NZ,RX
+   458                          
+   459   001780 3d                     	DEC 	A
+   460   001781 1869                   	JR 	RNX
+   461                          
+   462   001783 0e0a            .EXAF  	LD 	C,$0A
+   463   001785 05                     	DEC 	B
+   464   001786 283b                   	JR 	Z,PS2
+   465                          
+   466   001788 0c              .EXDE  	INC 	C
+   467   001789 05                     	DEC 	B
+   468   00178a 2837                   	JR 	Z,PS2
+   469                          
+   470   00178c 102a            .REG8S 	DJNZ 	ACCUM
+   471                          
+   472   00178e e607            .R8    	AND 	7
+   473   001790 fe06                   	CP 	6
+   474   001792 2030                   	JR 	NZ,PS3
+   475                          
+   476   001794 3628                   	LD 	(HL),'('
+   477   001796 23                     	INC 	HL
+   478   001797 cdfc17                 	CALL 	REGX
+   479   00179a dd7e02                 	LD 	A,(IX+2)
+   480   00179d b7                     	OR 	A
+   481   00179e 2858                   	JR 	Z,RP
+   482                          
+   483   0017a0 362b                   	LD 	(HL),43 		;+
+   484   0017a2 07                     	RLCA
+   485   0017a3 0f                     	RRCA
+   486   0017a4 3004                   	JR 	NC,POS
+   487                          
+   488   0017a6 362d                   	LD 	(HL),45			;-
+   489   0017a8 ed44                   	NEG
+   490                          
+   491   0017aa 23              .POS   	INC 	HL
+   492   0017ab eb                     	EX 	DE,HL
+   493   0017ac e5                     	PUSH 	HL
+   494   0017ad 60                     	LD 	H,B
+   495   0017ae 6f                     	LD 	L,A
+   496   0017af 0efb                   	LD 	C,$FB
+   497   0017b1 cd4518                 	CALL 	CONVHL
+   498   0017b4 e1                     	POP 	HL
+   499   0017b5 eb                     	EX 	DE,HL
+   500   0017b6 1840                   	JR 	RP
+   501                          
+   502   0017b8 1f              .ACCUM 	RRA
+   503   0017b9 1f                     	RRA
+   504   0017ba 1f                     	RRA
+   505                          
+   506   0017bb 0e07            .COMMON	LD 	C,7
+   507   0017bd 05                     	DEC 	B
+   508   0017be 2803                   	JR 	Z,PS2
+   509                          
+   510   0017c0 0d              .PORTC 	DEC 	C
+   511   0017c1 1003                   	DJNZ 	IDAT8
+   512                          
+   513   0017c3 79              .PS2   	LD 	A,C
+   514   0017c4 183b            .PS3   	JR 	PS4
+   515                          
+   516   0017c6 1008            .IDAT8 	DJNZ 	IDAT16
+   517   0017c8 3628                   	LD 	(HL),'('
+   518   0017ca 23                     	INC 	HL
+   519   0017cb cd3c17                 	CALL 	D8
+   520   0017ce 1828                   	JR 	RP
+   521                          
+   522   0017d0 1008            .IDAT16	DJNZ 	REG8
+   523   0017d2 3628                   	LD 	(HL),'('
+   524   0017d4 23                     	INC 	HL
+   525   0017d5 cd4b17                 	CALL 	D16
+   526   0017d8 181e                   	JR 	RP
+   527                          
+   528   0017da 05              .REG8  	DEC 	B
+   529   0017db 28b1                   	JR 	Z,R8
+   530                          
+   531   0017dd 1004            .IPAREF 	DJNZ 	REG16
+   532   0017df e609                   	AND 	9
+   533   0017e1 181e                   	JR 	PS4
+   534                          
+   535   0017e3 1f              .REG16 	RRA
+   536   0017e4 100a                   	DJNZ 	IREG16
+   537                          
+   538   0017e6 e603            .R16   	AND 	3
+   539   0017e8 fe02            .RX    	CP  	2
+   540   0017ea 2810                   	JR 	Z,REGX
+   541                          
+   542   0017ec c60c            .RNX   	ADD 	A,$0C
+   543   0017ee 1811                   	JR 	PS4
+   544                          
+   545   0017f0 100a            .IREG16	DJNZ 	REGX
+   546   0017f2 3628                   	LD 	(HL),'('
+   547   0017f4 23                     	INC 	HL
+   548   0017f5 cde617                 	CALL 	R16
+   549                          
+   550   0017f8 3629            .RP    	LD 	(HL),')'
+   551   0017fa 23                     	INC 	HL
+   552   0017fb c9                     	RET
+   553                          
+   554   0017fc dd7e01          .REGX  	LD 	A,(IX+1)
+   555   0017ff c610                   	ADD 	A,$10
+   556                          
+   557   001801 eb              .PS4   	EX 	DE,HL
+   558   001802 e5                     	PUSH 	HL
+   559   001803 210c18                 	LD 	HL,RGSTRS
+   560   001806 cd6518                 	CALL 	XTRACT
+   561   001809 e1                     	POP 	HL
+   562   00180a eb                     	EX 	DE,HL
+   563   00180b c9                     	RET
+   564                          
+   565                          ;*************
+   566                          
+   567   00180c c2              .RGSTRS	defb 	'B'				+$80
+   568   00180d c3              	defb 	'C'       			+$80
+   569   00180e c4              	defb 	'D'       			+$80
+   570   00180f c5              	defb 	'E'       			+$80
+   571   001810 c8              	defb 	'H'       			+$80
+   572   001811 cc              	defb 	'L'       			+$80
+   573   001812 2843a9          	defb 	'(','C',')' 			+$80
+   574   001815 c1              	defb 	'A'       			+$80
+   575   001816 c9              	defb 	'I'       			+$80
+   576   001817 d2              	defb 	'R'       			+$80
+   577   001818 41462c4146a7    	defb 	'A','F',',','A','F','\''	+$80
+   578   00181e 44452c48cc      	defb 	'D','E',',','H','L'    		+$80
+   579   001823 42c3            	defb 	'B','C'             		+$80
+   580   001825 44c5            	defb 	'D','E'             		+$80
+   581   001827 41c6            	defb 	'A','F'             		+$80
+   582   001829 53d0            	defb 	'S','P'             		+$80
+   583   00182b 48cc            	defb 	'H','L'             		+$80
+   584   00182d 49d8            	defb 	'I','X'             		+$80
+   585   00182f 49d9            	defb 	'I','Y'             		+$80
+   586   001831 285350a9        	defb 	'(','S','P',')'       		+$80
+   587   001835 4eda            	defb 	'N','Z'             		+$80
+   588   001837 da              	defb 	'Z'                		+$80
+   589   001838 4ec3            	defb 	'N','C'             		+$80
+   590   00183a c3              	defb 	'C'                		+$80
+   591   00183b 50cf            	defb 	'P','O'             		+$80
+   592   00183d 50c5            	defb 	'P','E'             		+$80
+   593   00183f d0              	defb 	'P'                		+$80
+   594   001840 cd              	defb 	'M'                		+$80
+   595   001841 b0              	defb 	'0'    				+$80
+   596   001842 bf              	defb 	'?'    				+$80
+   597   001843 b1              	defb 	'1'    				+$80
+   598   001844 b2              	defb 	'2'    				+$80
+   599                          
+   600                          ;********************
+   601                          
+   602   001845 97              .CONVHL	SUB 	A
+   603                          
+   604   001846 f5              .CVHL1 	PUSH 	AF
+   605   001847 97                     	SUB 	A
+   606   001848 0610                   	LD 	B,16
+   607                          
+   608   00184a 81              .CVHL2 	ADD 	A,C
+   609   00184b 3801                   	JR 	C,CVHL3
+   610   00184d 91                     	SUB 	C
+   611                          
+   612   00184e ed6a            .CVHL3 	ADC 	HL,HL
+   613   001850 17                     	RLA
+   614   001851 10f7                   	DJNZ 	CVHL2
+   615                          
+   616   001853 20f1                   	JR 	NZ,CVHL1
+   617                          
+   618   001855 fe0a                   	CP 	10
+   619   001857 04                     	INC 	B
+   620   001858 30ec                   	JR 	NC,CVHL1
+   621                          
+   622   00185a fe0a            .CVHL4 	CP 	10
+   623   00185c de69                   	SBC 	A,$69
+   624   00185e 27                     	DAA
+   625   00185f 12                     	LD 	(DE),A
+   626   001860 13                     	INC 	DE
+   627   001861 f1                     	POP 	AF
+   628   001862 20f6                   	JR 	NZ,CVHL4
+   629                          
+   630   001864 c9                     	RET
+   631                          
+   632                          ;****************
+   633                          
+   634   001865 b7              .XTRACT	OR 	A
+   635   001866 2808                   	JR 	Z,COPY
+   636                          
+   637   001868 cb7e            .SKIP  	BIT 	7,(HL)
+   638   00186a 23                     	INC 	HL
+   639   00186b 28fb                   	JR 	Z,SKIP
+   640                          
+   641   00186d 3d                     	DEC 	A
+   642   00186e 20f8                   	JR 	NZ,SKIP
+   643                          
+   644   001870 7e              .COPY  	LD 	A,(HL)
+   645   001871 07                     	RLCA
+   646   001872 cb3f                   	SRL 	A
+   647   001874 12                     	LD 	(DE),A
+   648                          
+   649   001875 13                     	INC 	DE
+   650   001876 23                     	INC 	HL
+   651   001877 30f7                   	JR 	NC,COPY
+   652                          
+   653   001879 c9                     	RET
+   654                          
+   655                          ;*******************
+   656                          
+   657   00187a 1a              .FETCH 	LD 	A,(DE)
+   658   00187b 13                     	INC 	DE
+   659   00187c dd3400                 	INC 	(IX+0)
+   660   00187f f5                     	PUSH 	AF
+   661   001880 cd8a18                 	CALL 	BYTSP
+   662   001883 f1                     	POP 	AF
+   663   001884 c9                     	RET
+   664                          
+   665   001885 7a              .ADRSP 	LD 	A,D
+   666   001886 cd9118                 	CALL 	BYTOP
+   667   001889 7b                     	LD 	A,E
+   668                          
+   669   00188a cd9118          .BYTSP 	CALL 	BYTOP
+   670   00188d 3e20                   	LD 	A,$20
+   671   00188f 1810                   	JR 	CHROP
+   672                          
+   673   001891 f5              .BYTOP 	PUSH 	AF
+   674   001892 1f                     	RRA
+   675   001893 1f                     	RRA
+   676   001894 1f                     	RRA
+   677   001895 1f                     	RRA
+   678   001896 cd9a18                 	CALL 	HEXOP
+   679   001899 f1                     	POP 	AF
+   680                          
+   681   00189a e60f            .HEXOP 	AND 	$0F
+   682   00189c fe0a                   	CP 	10
+   683   00189e de69                   	SBC 	A,$69
+   684   0018a0 27                     	DAA
+   685                          
+   686                          ; -----------------------------------
+   687                          ;
+   688                          ; End of John Kerr's DIS-Z80 routine.
+   689                          ;
+   690                          ; The next routine outputs a character.
+   691                          ;
+   692                          ; -------------------------------------
+   693                          
+   694   0018a1 e5              .CHROP 	PUSH 	HL
+   695   0018a2 d5                     	PUSH 	DE
+   696   0018a3 c5                     	PUSH 	BC
+   697                          
+   698   0018a4 4f              	ld	c, a
+   699   0018a5 cd5311          	call	conout
+   700                          
+   701                          ;	ld	h,0
+   702                          ;	ld	l,a
+   703                          ;	push	hl		; parameter passing
+   704                          ;      	call 	fputc_cons	; This calls the Z88DK "put char" function
+   705                          ;	pop	hl
+   706                          
+   707   0018a8 c1                     	POP 	BC
+   708   0018a9 d1                     	POP 	DE
+   709   0018aa e1                     	POP 	HL
+   710                          
+   711   0018ab c9                     	RET
+   712                          
+   713                          
+   714                          
+sallytest.asm:
+   486                          
+z80.asm:
+   245                          
