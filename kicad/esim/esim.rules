@@ -1,0 +1,120 @@
+
+(rules PCB esim
+  (snap_angle 
+    fortyfive_degree
+  )
+  (autoroute_settings
+    (fanout off)
+    (autoroute on)
+    (postroute on)
+    (vias on)
+    (via_costs 50)
+    (plane_via_costs 5)
+    (start_ripup_costs 100)
+    (start_pass_no 1452)
+    (layer_rule F.Cu
+      (active on)
+      (preferred_direction horizontal)
+      (preferred_direction_trace_costs 1.0)
+      (against_preferred_direction_trace_costs 2.0)
+    )
+    (layer_rule B.Cu
+      (active on)
+      (preferred_direction vertical)
+      (preferred_direction_trace_costs 1.0)
+      (against_preferred_direction_trace_costs 2.0)
+    )
+  )
+  (rule
+    (width 300.0)
+    (clearance 200.0)
+    (clearance 150.0 (type smd_to_turn_gap))
+    (clearance 50.0 (type smd))
+    (clearance 200.0 (type "kicad_default"))
+    (clearance 200.0 (type Power))
+  )
+  (padstack "Via[0-1]_600:300_um"
+    (shape
+      (circle F.Cu 600.0 0.0 0.0)
+    )
+    (shape
+      (circle B.Cu 600.0 0.0 0.0)
+    )
+    (attach off)
+  )
+  (padstack "Via[0-1]_1000:300_um"
+    (shape
+      (circle F.Cu 1000.0 0.0 0.0)
+    )
+    (shape
+      (circle B.Cu 1000.0 0.0 0.0)
+    )
+    (attach off)
+  )
+  (via 
+    "Via[0-1]_600:300_um" "Via[0-1]_600:300_um" default
+  )
+  (via 
+    "Via[0-1]_1000:300_um" "Via[0-1]_1000:300_um" default
+  )
+  (via 
+    "Via[0-1]_600:300_um-kicad_default" "Via[0-1]_600:300_um" "kicad_default"
+  )
+  (via 
+    "Via[0-1]_1000:300_um-kicad_default" "Via[0-1]_1000:300_um" "kicad_default"
+  )
+  (via 
+    "Via[0-1]_600:300_um-Power" "Via[0-1]_600:300_um" Power
+  )
+  (via 
+    "Via[0-1]_1000:300_um-Power" "Via[0-1]_1000:300_um" Power
+  )
+  (via_rule
+    default "Via[0-1]_600:300_um"
+  )
+  (via_rule
+    "kicad_default" "Via[0-1]_600:300_um-kicad_default"
+  )
+  (via_rule
+    Power "Via[0-1]_1000:300_um-Power"
+  )
+  (class default
+    (clearance_class default)
+    (via_rule default)
+    (rule
+      (width 300.0)
+    )
+    (circuit 
+      (use_layer F.Cu B.Cu)
+    )
+  )
+  (class "kicad_default"
+    /D5 /D4 /D6 /D0 /D3 /D1 /D7 /D2
+    RES\ RAMOE\ /A4 RAMCE\ RXD /A6 /A1 /A5
+    "unconnected-(U1-P3.7-Pad17)" /A11 /A0 "unconnected-(U1-P2.7{slash}A15-Pad28)" "unconnected-(U1-P2.6{slash}A14-Pad27)" RAMWE\ /A9 "unconnected-(U1-P3.5-Pad15)"
+    "unconnected-(U1-P2.5{slash}A13-Pad26)" "unconnected-(U1-~{PSEN}-Pad29)" /A10 "unconnected-(U1-ALE-Pad30)" "unconnected-(U1-P3.6-Pad16)" /A7 /A8 /A3
+    /A12 TXD SIM\ /A2 XTAL1 XTAL2 CS\ /RA11
+    "unconnected-(U3-A14-Pad1)" /RD3 /RA10 /RA4 OE\ /RA5 /RA0 /RA8
+    WE\ /RA1 /RD2 "unconnected-(U3-A13-Pad26)" /RD6 /RD0 /RA3 /RD4
+    /RD5 /RD1 /RA12 /RA7 /RA2 /RD7 /RA9 /RA6
+    (clearance_class "kicad_default")
+    (via_rule "kicad_default")
+    (rule
+      (width 300.0)
+    )
+    (circuit 
+      (use_layer F.Cu B.Cu)
+    )
+  )
+  (class Power
+    +5V GND
+    (clearance_class Power)
+    (via_rule Power)
+    (rule
+      (width 1000.0)
+    )
+    (circuit 
+      (use_layer F.Cu B.Cu)
+    )
+  )
+)
