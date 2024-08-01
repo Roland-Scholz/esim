@@ -7,7 +7,7 @@ set ASM=z80asm
 rem set ASM=z80asm.exe
 rem set ASM=tniasm.exe
 
-call :compile z80 0000
+call :compile z80 0140
 if not %ERRORLEVEL%==0 goto error
 
 

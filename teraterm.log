@@ -1,0 +1,1666 @@
+type read.me
+
+
+What is on this disk
+====================
+
+from SWP:
+---------
+MAKESYS.DOC .... read this to learn how 
+                 to make a system disk.
+NEWS.DOC ....... read about new ATR8000
+                 CP/M system software.
+MODEM.DOC ...... instructions for modem
+                 program from CPMUG.
+
+DDINIT.COM ..... diskette formatting
+                 and verifying program.
+DDSYSGEN.COM ... program to read/write
+                 system area of disks.
+CONFIG.COM ..... customized CP/M system
+                 generation program.
+SYSTEM.SWP ..... relocatable copy of
+                 CP/M and SWP bios.
+MODEM.COM ...... MODEM7 communications
+                 program for ATR8000.
+DISKDEF.COM .... program to set up ATR
+                 to use disks made by
+                 other computers.
+DISKMON.COM .... utility program for
+                 tinkering with disks at
+                 the track/sector level.
+
+from Digital Research:
+----------------------
+DDT.COM ........ 8080 machine language
+                 debug utility. 
+ASM.COM ........ 8080 assembler.
+LOAD.COM ....... loader for making .HEX
+                 file into .COM file.
+ED.COM ......... simple text editor.
+MOVCPM.COM ..... CP/M relocator.
+SUBMIT.COM ..... batch command file
+                 processor.
+XSUB.COM ....... more batch processor.
+SYSGEN.COM ..... 8 inch single density
+                 disk sysgen.
+PIP.COM ........ file copying program.
+STAT.COM ....... program to display and
+                 change various system
+                 parameters.
+
+from the public domain:
+-----------------------
+D.COM .......... fancy file directory
+                 listing program.
+DISK76.COM ..... improved file copying
+                 utility. replaces the
+                 functions of PIP.
+A>dir
+
+A: READ     ME  : NEWS     DOC : MAKESYS  DOC : MODEM    DOC
+A: DDSYSGEN COM : CONFIG   COM : DDINIT   COM : MODEM    COM
+A: DISKMON  COM : D        COM : PIP      COM : SUBMIT   COM
+A: XSUB     COM : ED       COM : ASM      COM : DDT      COM
+A: LOAD     COM : STAT     COM : SYSGEN   COM : DISK76   COM
+A: DISKDEF  COM : MEMTEST  COM : MEMTEST  DOC : MOVCPM   COM
+A: SYSTEM   SWP : GO       COM : TEST     DO 
+A>type news.doc
+
+NEW CP/M PACKAGE RELEASED FOR THE ATR8000
+-----------------------------------------
+
+   SWP  Microcomputer Products Inc.  will be distributing a  much 
+enhanced  version  of CP/M 80 for the ATR8000  computer  sometime 
+after  late  April or early May 1984.  This package will  include 
+many new features requested by SWP customers since the last  CP/M 
+release in March 1982. Anyone who has purchased  CP/M from SWP in
+the past may obtain a copy of the new software for $25. 
+
+   The  new  software includes changes to the existing CP/M  bios 
+and utility programs as well as some completely new programs  and 
+facilities.  A summary of the changes or additions to each of the 
+major CP/M building blocks is given below.
+
+--- BIOS ---
+
+   The  main changes in the bios have been in the area of  double 
+sided  disk formats.  The old bios could not distinguish  between 
+single  and  double sided disks.  This caused a lot of  headaches 
+when trying to copy files between the two types of media, and led 
+to  the rather exasperating restriction that you had to  make  an 
+intermediate  single density copy of the files you were   moving. 
+The new bios now allows you to operate on a single sided diskette 
+in  a  drive that is configured for double sided  operation.  The 
+double  sided  disk format has also been changed,  from  the  old 
+style where the lower 1/2 of the tracks were on side 0, to a more 
+universal format where the even numbered tracks are on side 0 and 
+the  odd  tracks  on side 1 (the  so-called  "interleaved"  track 
+format). This format is superior because it reduces the amount of 
+head  movement needed in most disk operations and thus speeds  up 
+the average access time. The old sytle DS formats have been added 
+to the DISKDEF program so you will have no trouble copying  files 
+from older DS disks.  A number of other lesser modifications have 
+been made to the bios, and these are listed below.
+
+1)If  you type a ^C with a non-system disk in drive A:,  the bios 
+  will issue a disk error instead of trying to load garbage  into 
+  memory in place of CP/M.
+2)Provisions have been made to allow the execution of an auto-run 
+  program after booting CP/M for the first time.
+3)More space has been made available for disk data structures. It 
+  is  now  posible to have 4 DS/DD 8 inch drives without  running 
+  out of memory in the bios.
+4)The  disk configuration mechanism has been  simplified.  It  is 
+  only  necessary  to  set  the NTRACKS byte for  each  drive  to 
+  configure for double sided, quad density etc.
+5)The  physical  disk  handler in the bios has been  expanded  to 
+  allow  the inclusion of user defined disk i/o code for  special 
+  applications.  This  mechanism  is used by the new  version  of 
+  DISKDEF described below.
+6)The  bios error messages for NOT READY and WRITE PROTECTED have 
+  been  replaced  by numbered error codes similar those  used  by 
+  the  other types of disk errors (as described in the  ATR  CP/M 
+  manual on   page 27). 
+
+
+--- DISKDEF ---
+
+   The  DISKDEF program has been expanded to allow operation with 
+a  number  of disk formats previously unusable  by  the  ATR8000, 
+particularly in the area of double sided formats. A wide range of 
+different  DS/DD  formats are now possible  including Kaypro  IV, 
+Epson  QX10,  Morrow  and all the old  ATR8000  formats.  Another 
+bizarre format that can now be read is the Superbrain,  which has 
+inverted  data similar to Atari disks.  The DISKDEF program  will 
+continue to be expanded both by SWP and outside contributors.  If 
+you  have  a  CP/M disk format that you would like added  to  the 
+list,  please send a sample disk with some files on it (long text 
+files  are  good) to SWP's technical  support  department,  along 
+with  a note describing as much as possible about the format  and 
+the machine that created it.  We will attempt to keep an  updated 
+version of DISKDEF available at all times.
+
+--- DDINIT ---
+
+   The  disk initialization program has been modified so that the 
+option to format single or double sided is now one of the prompts 
+issued when the program is run. Previously it was not possible to 
+format  double sided unless you had first created a double  sided 
+CP/M  system. Some new features have also been added for  special 
+less frequently used applications.  These features are invoked by 
+typing  a slash and an option character after the command to  run 
+DDINIT.  There  are currently three such options  available.  The 
+/Q  option allows you to format 80 track double  sided  diskettes 
+(sometimes  called  quad density),  the /D option allows  you  to 
+format  40  track disks in an 80 track drive  by  double  steping 
+between  tracks,  and  the /0 option makes the  formatter  create 
+disks  with the starting sector number being zero (instead of one 
+as in the standard IBM format).
+
+
+--- DDSYSGEN ---
+
+   DDSYSGEN  has been expanded to include the functions  provided 
+by the CP/M utility program MOVCPM. This allows you to generate a 
+CP/M system with an arbitrary memory size from 20K up to 60K. The
+relocation  feature is envoked by typing DDSYSGEN 0XX <cr>  where 
+XX is the page address of where the CCP begins in memory. This is 
+D4  hex for a 60K system and one less than D4 for each 256  bytes 
+less  than  60K.  For example DDSYSGEN 0D0 <cr> generates  a  59K 
+system, and DDSYSGEN 034 <cr> would create a 20K system. The free 
+space created by generating a less than 60K CP/M will occupy  the 
+area  just below the monitor at F000 hex and extending down below 
+there for the amount specified.  In a 59K system this would  mean 
+that the area from EC00 to EFFF would be unused by CP/M. When the 
+sysgen  program is run in the 'MOVCPM' mode just  described,  the 
+normal  main menu is bypassed and the program goes immediately to 
+the  symbolic patch function after generating the relocated  CP/M 
+system  image in memory.  At this point you can either write  the 
+system onto a disk in drive A: or else exit DDSYSGEN and save the 
+memory image onto a file by typing SAVE 69 CPMxx.COM. A few minor 
+features of the user interface in DDSYSGEN have been altered, but 
+these  are  trivial  enough  that the  program  should  still  be 
+operable by someone familiar with the old version of DDSYSGEN.
+
+
+--- CONFIG ---
+
+   This  is a newly written utility program for the ART8000  that 
+provides a painless,  user friendly way to create customized CP/M 
+system  boot disks.  CONFIG is the program that allows you to set 
+the printer type,  the serial port baudrate,  the number and type 
+of disk drives,  the size of the TPA etc.  without having to know 
+anything  about  the  inner  workings of the  parameters  in  the 
+ATR8000 bios.  Simply run CONFIG and answer the questions and  it 
+will construct a customized CP/M for you. Upon completion, CONFIG 
+automatically  loads the DDSYSGEN program so that the new  system 
+can be written onto a boot disk. This program will only work with 
+the new version of CP/M from SWP, so please do not attempt to use 
+it with the previous bios and/or utility programs.
+
+
+
+
+
+A>dir
+
+A: READ     ME  : NEWS     DOC : MAKESYS  DOC : MODEM    DOC
+A: DDSYSGEN COM : CONFIG   COM : DDINIT   COM : MODEM    COM
+A: DISKMON  COM : D        COM : PIP      COM : SUBMIT   COM
+A: XSUB     COM : ED       COM : ASM      COM : DDT      COM
+A: LOAD     COM : STAT     COM : SYSGEN   COM : DISK76   COM
+A: DISKDEF  COM : MEMTEST  COM : MEMTEST  DOC : MOVCPM   COM
+A: SYSTEM   SWP : GO       COM : TEST     DO 
+A>type makesys.doc
+
+Installing a Customized Version of CP/M
+---------------------------------------
+
+   This is your master CP/M system disk. 
+It  should  be kept in a safe place  and 
+only  be  used to make  copies.  If  you 
+would  like  to make a working  copy  of 
+CP/M from this master, please follow the 
+steps  outlined below.  
+
+1) Run  the  DDINIT program and  make  a 
+   supply of initialized diskettes. Read 
+   about  this  function in the  ATR8000 
+   manual  if  you are  unfamiliar  with
+   disk formatting.
+2) Put this disk  back in drive  A:  and 
+   run the CONFIG program.  This program 
+   will ask a series of questions  about 
+   your  system and create a  customized 
+   CP/M to your specifications.
+3) When CONFIG asks you to insert a disk 
+   to write the system onto,  remove the    
+   master disk from drive A:, put in one 
+   of  the  disks  made in step  #1  and 
+   press return. 
+4) Wait  until the  program asks if  you 
+   would  like to repeat step  #3.  Then 
+   press the reset button on the ATR8000 
+   and re-boot CP/M using the newly made 
+   disk.
+5) Use  PIP to copy  the files from  the 
+   master CP/M disk onto your new  empty 
+   system disk.  If you have two drives, 
+   this is done by putting the master in
+   drive  B:  and typing  the  following 
+   command.
+
+   B:PIP A:=B:*.*[V]
+
+   If you have configured the system for 
+   only  one  disk drive,  this  command 
+   will  still  work  but  you  will  be 
+   prompted to change diskettes in drive 
+   A:  whenever  PIP switches  back  and 
+   forth  between  the master disk  (B:) 
+   and the copy disk (A:).
+
+A>dir
+
+A: READ     ME  : NEWS     DOC : MAKESYS  DOC : MODEM    DOC
+A: DDSYSGEN COM : CONFIG   COM : DDINIT   COM : MODEM    COM
+A: DISKMON  COM : D        COM : PIP      COM : SUBMIT   COM
+A: XSUB     COM : ED       COM : ASM      COM : DDT      COM
+A: LOAD     COM : STAT     COM : SYSGEN   COM : DISK76   COM
+A: DISKDEF  COM : MEMTEST  COM : MEMTEST  DOC : MOVCPM   COM
+A: SYSTEM   SWP : GO       COM : TEST     DO t
+A>ype   type modem.doc
+
+
+                      *** SMODEM ***
+
+              PUBLIC DOMAIN CP/M MODEM PROGRAM
+              ================================
+                        Version 3.6
+                  Adapted by Walter Blady
+        Upgraded to version 3.7 by Jim Mills, CACHE.
+
+      A MODEM UTILITY PROGRAM SPECIALLY CONFIGURED FOR
+       THE ATR8000 COMPUTER WITH 64K RAM AND CP/M 2.2
+
+
+                          FOREWORD
+
+     This program was originally MODEM7.MAC written by 
+Ward Christensen and revised by M.Zeiger and J.Mills for the
+PMMI modem board.  Full credits for expertise and talent 
+that made this program possible, belong solely to these 
+people.
+
+     Many other individuals contributed to the developement 
+of this program,  but mentioning them and their 
+contributions here would make this file somewhat 
+unmanagable.  Rightful credits are documented in various 
+versions of MODEM.  My appologies.
+
+     Many additional routines included are copyrighted 
+(1980) by Mark M.Zeiger and J.Mills.  Permission is granted 
+to use, but not to sell these routnes.
+
+
+     Enhancements were added to the original program to 
+take advantage of Smartmodem's Auto Dial feature, Escape to 
+Command Mode and On Hook features.
+
+These features include...
+
+     - Kill a disk file.
+     - Terminal mode/Echo mode toggle.
+     - List device toggle, (terminal mode).
+     - Send/receive object-code informal file (terminal mode).
+     - CRC - (cycle redundancy check option).
+     - Auto line-feed is generated in the Echo mode.    
+     - Greatly enhanced menu.
+     - Display number of file sectors in decimal and hex
+       during SEND/RECEIVE file.
+     - XON-XOFF recognition in transfer informal file mode.
+     - Telephone directory
+     - The telephone directory is a separate file.  This allows
+       fast editing without the need to recompile the modem
+       program.  Also, many directories may be accessed.
+     - Auto-dial from internal directory to SMARTMODEM.
+     - Direct dial from program intiation or from menu.
+
+
+                    *** SMODEM MENU ***
+
+COMMANDS - IN MENU MODE
+=======================
+WRT  - Write informal file to disk
+DEL  - Erase informal file from disk
+RET  - Return to terminal mode (no data loss)
+SET  - Set modem port baudrate and parity
+CAL  - Auto dial from list (SMARTMODEM)
+XPR  - Expert mode (Toggle menu on/off)
+DIR  - Directory <drive>
+CPM  - Exit to CP/M
+K    - Kill disk file [fn.ext]
+S... - Send CP/M file [fn.ext]      SECONDARY OPTIONS
+R... - Receive CP/M file [fn.ext]   =================
+T    - Terminal mode <fn.ext>    ...B  - Batch file mode
+E    - terminal mode with Echo   ...S  - show as Sent
+                                 ...R  - show as Received
+COMMANDS - IN TERMINAL MODE      ...V  - View as sent/received
+===========================      ...Q  - Quiet, no messages
+^O   - Off line/exit to menu     ...T  - return to Terminal mod
+^Z   - END of file               ...E  - return to Echo mode
+^S   - XOFF character            ...D  - Disconnect phone
+^Q   - XON character             ...C  - CRC check/not checksum
+^P   - Printer (toggle on/off)           (receive option only)
+^T   - Transmit informal file    ...A  - Answer Mode (& offhook)
+^R   - Receive informal file     ...O  - Orig. Mode (& offhook)
+^E   - Terminal/Echo (toggle on/off)
+^D   - Disconnect phone (SMARTMODEM)
+^X   - Cancel send/receive
+
+
+                   COMMANDS IN MENU MODE
+                    DETAILED EXPLANATION
+
+                           *****
+
+WRITE INFORMAL FILE TO DISK - 'WRT'
+-----------------------------------
+     For the porpose of definition, an 'Informal file' is 
+one which is set-up for recieving or transmitting data,
+without data validity checks, in the terminal mode.
+
+     When data has been saved to an 'Informal file', the 
+file must be closed before continuing with other options.  
+The 'WRT' command writes all remaining buffered data to the 
+disk and then closes the file.  Information will be lost 
+if this is not done.
+
+
+DELETE INFORMAL FILE - 'DEL'
+----------------------------
+     This command will delete the 'Informal file' and it 
+won't be saved on the disk.  All information held in memory 
+from previous saves will be erased.
+
+
+RETURN TO TERMINAL MODE - 'RET'
+-------------------------------
+     The 'RET' command is used to re-enter the terminal mode 
+with no data loss.
+
+     If information has been saved to an 'Informal file', 
+the user may re-enter the menu mode, but all saved data 
+will be lost if a return to the terminal mode is made with 
+the 'T or E' options. Using the 'RET' allows re-entry to the 
+terminal mode and preserves all saved information.
+
+
+SET BAUDRATE AND PARITY - 'SET'
+-------------------------------
+     This command allows the user to set the baudrate and
+parity of the modem port. To use the command simply type 'SET'
+followed by a carriage return. The current baudrate will be
+displayed on the screen, at which time the user can display the
+next value by typing on the space bar. When the desired new baudrate
+is displayed it can be selected permanently by typing a carriage
+return. The parity setting is handled in the same way.
+     The parity setting only affects transmitted data. Received
+data always has the parity bit forced to a zero if odd or even
+parity is selected. Select the no parity option when using the
+'formal' file send/receive functions of SMODEM.
+
+
+AUTO-DIAL (SMARTMODEM) - 'CAL, C'
+---------------------------------
+     The Auto-dial feature allows the user to call a number
+automatically from one of several phone directories.
+
+     Auto-dial primary option may be used in three different 
+ways when initiating SMODEM:
+
+eg. Initiate and ask for directory name.
+
+    SMODEM C            
+            ^
+       (primary option)
+
+eg. Initiate and load the default directory 'PHONE.001', then
+dial the number associated with the directory letter 'M'.
+
+    SMODEM C M
+              ^  
+      (directory-letter)
+
+eg. Initiate and dial the given number.
+
+    SMODEM C 231-1898
+                 ^
+            (any number)
+
+     Auto-dial may also be used from the MENU mode with 'CAL',
+The commands are exactly the same except the code 'CAL' is
+used instead of the 'C' primary option.
+
+     If the command 'CAL' is used alone, SMODEM will ask for
+a directory name.
+
+     When the phone directory is up, any number in 
+the directory may be dialed by entering a 'directory-letter 
+and pressing return.  Or any number may be typed in the 
+command line.  The dial command 'ATD' and the selected 
+number are automatically sent to the SMARTMODEM.
+
+     If you wish to cancel a call while the phone is ringing,
+press return. The 'NO CARRIER' message will be sent and 
+SMARTMODEM will go to an on hook (hang-up) state.  To redial
+the same number, give the command 'A/'.  All the standard 
+HAYES commands can be issued while in the terminal mode.
+
+     A second option for dialing a number is from the terminal
+mode, using the standard SMARTMODEM dial command.  Simply type 
+ATD <phone number>
+
+
+TELEPHONE DIRECTORY
+-------------------
+     Directories may be given any name and kept on any disk, 
+but there must always be a 'Default directory' with the name
+'PHONE.001' on the default drive.  SMODEM automatically loads
+this file if a direct dial is called for.
+
+     Phone directories may be set-up in two different ways; 
+(see the models below).  These models could be saved to  
+separate files and used as actual directories.  More may be 
+set up by duplicating the model over and over.  Only the 
+entries need be changed.
+
+
+EXPERT MODE - 'XPR, X'
+----------------------
+     If the 'X' option is included in the command line when 
+SMODEM is initiated, it will come up with the menu display 
+turned off.  The menu may be toggled on and off during run-
+time with the 'XPR' option. Therefore it is best to run with
+the menu off and toggling to it only when necessary, this 
+action permits messages to be seen that would otherwise be
+lost due to the menus clear screen function.
+
+
+DIRECTORY - 'DIR <d:>'
+----------------------
+     This option prints the specified disk directory to the 
+screen.
+
+
+RE-ENTER CP/M - 'CPM'
+---------------------
+     This option terminates the modem program and returns to 
+the cp/m operating system.
+
+
+KILL A DISK FILE - 'K file.name'
+--------------------------------
+     Files may be deleted from the disk without leaving the 
+modem program.  CP/M rules apply.
+
+eg. >>K file.name,  >>K *.ASM,  >>K B:file.A?M
+
+
+               PRIMARY AND SECONDARY OPTIONS
+                    DETAILED EXPLANATION
+
+                           *****
+
+     There are eight primary options in SMODEM.
+
+     Originate and Answer options are not used since 
+SMARTMODEM handles these automatically.  
+
+     A primary option may be included in a command line when 
+initiating SMODEM, or while in the menu mode, but only ONE is 
+allowed.  The exception is with 'T', 'M' and 'E'.  They may be
+used as secondary options during 'send' or 'receive'
+
+     S... Send a file       R... Receive a file 
+
+     T... Terminal mode     E    Echo mode 
+
+     X    Expert mode       C... Auto-dial mode 
+
+     M    Menu mode         K... Kill a CP/M file
+
+     There are twelve secondary options. These options may 
+be entered in a command line when initiating SMODEM or
+while in the menu mode.  
+
+     More than one secondary option may be included in a 
+command line.  If the (CRC) option is used, then a maximum of 
+six may be included.  As you can see, 'T', 'M' and 'E' are 
+also used as secondary options.
+
+
+...S Print to screen/sending    ...R Print to screen/receiving
+
+...V Print send & receive       ...Q Don't print messages
+
+...T Return to Terminal mode    ...E Return to Echo mode
+
+...D Disconnect                 ...B Batch files mode
+
+...C (CRC) request              ...M Return to Menu mode        
+     cyc. redundancy check
+     (option in receive only)     
+
+...A Answer Tone connect        ...O Originate Tone connect
+        to phone line.          to phone line.
+
+               SENDING/RECEIVING WITH SMODEM
+
+                           *****
+
+              (Sending/Receiving FORMAL Files)
+
+
+     The clasification 'FORMAL' means that all transmitted
+data are checked for validity against received data.  There
+are two data-check options available. (See information below.)
+
+     If a primary option is used in a command line when 
+initiating SMODEM, it must be the first character following 
+the name SMODEM, with one space preceeding it.  Secondary 
+options immediately follow the primary, with no spaces.
+Secondary options may be entered in any order.
+
+     eg. SMODEM SQT B:file.name
+                 ^
+        (primary option) 
+
+The above command line means:
+  
+  SMODEM...Initiate SMODEM
+        S...Send a file
+        Q...Don't print any system messages on the screen
+        T...After the file is sent, go to the terminal mode
+       B:...The file is on drive B:
+file.name...The name of the file to be sent
+            (File names may contain ambiguous references,
+            according to the rules of CP/M)
+
+     The 'B' batch file secondary option may ONLY be used 
+from the menu mode.  It may not be included in a command 
+line during initiation of SMODEM.
+
+     Command lines entered from the menu mode are virtually 
+the same, except the word 'SMODEM' is not typed.
+
+     eg. >>RRD file.name
+           ^
+    (primary option)
+
+The above command line means:
+
+        R...Receive a file
+        R...Type the file to screen as it is being received
+        D...Disconnect the phone after the file is received
+file.name...The name of the received file.  
+            (The file.name doesn't have to match the sender's.
+            Ambiguous reference in file.name is NOT allowed 
+            with the receive option.)
+
+     When sending a batch of files, ambiguous references may 
+be used according to the rules of CP/M.  
+
+     eg. >>SBST *.BAS
+
+        S...Send files
+        B...Batch mode
+        S...Print files to the screen as they're being sent
+        T...When through, enter the terminal mode
+    *.BAS...Send all the files on the default disk with the 
+            extention of 'BAS'.
+
+     eg. >>SBCM file.name1 file.name2...n
+
+        S...Send files
+        B...Batch mode
+        M...Enter the menu mode after all files are sent
+file.name...The list of files to be sent.
+
+
+     When receiving files in Batch mode, the file names are 
+NOT specified.  They are sent by the sender.  SMODEM 
+automatically receives and uses these names on the disk.
+ 
+     eg. >>RBCE
+
+        R...Receive files
+        B...Batch mode
+        C...Send a (CRC) character redundancy request to the 
+            sender specifying a (CRC) check of data instead   
+            of the default CHECKSUM method.
+        E...Go to the Echo mode after all files have been
+            received.
+
+
+             (Sending/Receiving INFORMAL Files)
+
+
+     Files may be sent or received from the Terminal mode.
+The clasification 'INFORMAL' simply means that data validity
+checks are NOT made on transmitted data. (You takes your 
+chances.)
+
+     To save data to an informal file, a file.name must first 
+be specified in the menu mode while giving the 'T' terminal 
+command.  The user is the asked if the received data is 
+object code.  (All data is either object code or ASCII.)
+
+     eg. >>T file.name
+
+     Once in the terminal mode, any incoming data may
+be saved to this file by simply pressing the '^R' receive
+toggle.  Data may be intermitantly saved by toggling on or 
+off.  As soon as all desired data is saved, the file must be 
+closed with the 'WRT' command, from the menu mode.  Incoming 
+material may be temporarily stopped and started by issuing the
+'^S' XOFF' and '^Q XON' commands.
+
+     To send an informal file, the '^T' transmit command is
+given from the terminal mode.
+
+     eg. ^T
+
+     Following this command the user is asked if the file
+to be sent is 'object code', then prompted for the file.name.
+The data is sent immediately following a carriage return, so 
+care must be taken that the receiver has enough time to
+prepare.
+
+
+                       OPTION SUMMARY
+
+                           *****
+
+                      PRIMARY OPTIONS
+                      ===============
+
+SEND A FILE - 'S...'
+--------------------
+     Send CP/M files individually or in batch mode using 
+CHECKSUMS or CRC checks.
+
+
+RECEIVE A FILE - 'R...'
+-----------------------
+     Receive CP/M files individually or in batch mode using 
+CHECKSUMS or CRC checks.
+
+
+TERMINAL MODE - 'T <file.name>'
+-------------------------------
+     Enter terminal mode (without echo.).  If <file.name> is
+specified, then an informal file is set up and data may be
+saved to this file using the (Receive) ^R' toggle.
+
+
+ECHO MODE - 'E'
+---------------
+     Enter echo mode.  Echo all characters back to the 
+sender.  Auto line feeds are sent following each carriage 
+return.  Both terminals may NOT be in echo mode at the same 
+time or SMODEM will go boobs up.
+
+
+EXPERT MODE - 'X'
+-----------------
+     This mode surpresses the menu display upon initiation 
+of SMODEM.
+
+
+AUTO-DIAL (SMARTMODEM) - 'C <command>'
+--------------------------------------
+     Dial a number directly or display the telephone 
+directory and wait for command.
+
+
+                     SECONDARY OPTIONS
+                     =================
+
+ANSWER TONE - 'A'
+-----------------
+     Selecting this option tells the smartmodem to go online
+using answer (higher frequency) tones.
+
+ORIGINATE TONE - 'O'
+--------------------
+     Selecting this option tells the smartmodem to go online
+using originate (lower frequency) tones.  If neither 'A' or 'O'
+are specified, SMODEM will assume you are already online and
+begin whatever command you gave it.
+
+SHOW FILE AS SENT - 'S'
+-----------------------
+     Selecting this option will display the file being sent, 
+on the screen.
+
+
+SHOW FILE AS RECEIVED - 'R'
+---------------------------
+     This option will display the file being received, on 
+the screen.
+
+
+SHOW FILE - 'V'
+---------------
+     Display sent or received file on the screen.
+
+
+QUIET MODE - 'Q'
+----------------
+     Surpress all system messages; (don't display on the 
+screen).
+
+
+TERMINAL MODE - 'T'
+-------------------
+     Enter the terminal mode.  <file.name> may not be 
+specified when when using 'T' as a secondary option.
+
+
+DISCONNECT (SMARTMODEM) - 'D'
+-----------------------------
+     Issue the 'Escape' code to the HAYES SMARTMODEM, then 
+hang up the telephone and re-enter the menu mode. 
+
+
+BATCH MODE - 'B'
+----------------
+     This option is used to send multiple files.
+
+     File names can be individually specified in the command 
+line, or they can be specified using ambiguous file names 
+(CP/M convention).  Individual file names are sent to the 
+receiver first, then the file contents, until all files are 
+sent.
+
+
+(CRC) cycle redundancy check - 'C'
+----------------------------------
+     SMODEM defaults to a 'checksum' method of checking data 
+validity during send/receive.  Although quite accurate, it 
+is not virtually error free.  The secondary option 'C' may 
+be included in the command line to force a (CRC) check of 
+data. The (CRC) methode is 99.99% error proof.  The only 
+restrictions are:
+
+   - Both sender and receiver must use one of the MODEM series
+     programmes that have the (CRC) option.
+
+   - The (CRC) option may only be included in a RECEIVE 
+     command line.
+
+     If SMODEM detects a request for (CRC) during a 
+SEND file, it automatically switches over and informs the 
+operater with a screen message.
+
+
+                   TERMINAL MODE OPTIONS
+
+                           *****
+
+OFF-LINE - ^O
+-------------
+     This command will allow re-entry to the menu mode 
+without disconnecting the phone.
+
+
+END OF FILE - ^Z
+----------------
+     This command sends an end of file ASCII character.
+
+
+XOFF - ^S
+---------
+     The XOFF character tells the sending computer to stop 
+data transmission temporarily.  (The sender must recognize
+XON/XOFF protocol).  XOFF is used in conjunction with the XON.
+
+
+XON - ^Q 
+--------
+     The XON character tells the sending computer to resume 
+data transmission.
+
+
+TERMINAL/ECHO (TOGGLE) - ^E
+---------------------------
+     Switching between Terminal mode and Echo mode can be 
+accomplished by pressing ^E.  A message is printed to warn if 
+ECHO ON or ECHO OFF.
+
+
+PRINTER (TOGGLE) - ^P
+---------------------
+      All incoming data may be sent to the printer while in 
+terminal mode. This feature does NOT operate while receiving 
+a file using the 'R' (receive) primary option.  A message is 
+printed warning if PRINTER ON or PRINTER OFF.  
+
+
+TRANSMIT INFORMAL FILE - ^T
+---------------------------
+     This command will send a disk file informally (without 
+error checking).
+
+     After pressing ^T, the user is prompted for the 
+file.name, and if the file being sent is object code.  
+The file is immediately sent following a carriage return.
+The transmission can be terminated with the cancel key ^X.  
+
+
+OBJECT CODE (SCREEN PROMT)
+--------------------------
+     Object code files may be SAVED or SENT while in the 
+terminal mode.  The user is prompted during informal file 
+transfer/receive as to whether an object code file is being 
+transmitted.  There are no checks to ensure data validity, 
+therefore this feature should only be used when it is not 
+possible to use the 'R' (receive) or 'S' (send) primary 
+options.
+
+
+RECEIVE INFORMAL FILE (TOGGLE) - ^R
+-----------------------------------
+     The receive toggle may be used only if a <file.name> was 
+specified when entering the terminal mode.
+
+eg.  T <file.name>
+
+     Alternately pressing 'R' turns the save feature ON and 
+OFF and the user is prompted with 'SAVE ON' or 'SAVE OFF' 
+message.  When the save function is ON, data is 
+simultainiously saved and printed on the screen, and each 
+printed line is preceded by a colon ':' (The colon is not
+sent to the file.)
+
+ECHO MODE (TOGGLE) - ^E
+-----------------------
+     Alternately pressing this key toggles between the 
+terminal mode and echo mode.  The user is prompted with an 
+'ECHO ON' or 'ECHO OFF' message.
+
+
+DISCONNECT (SMARTMODEM) - ^D
+----------------------------
+     This key sends the SMARTMODEM default escape code '+++'  
+then issues the command 'ATH' causing the modem to go to 
+an ON-HOOK state (hang up).  
+
+
+CANCEL SEND/RECEIVE - ^X
+------------------------
+     This key may be used to cancel files being sent or 
+received in the informal mode, or files being sent using the 
+primary option 'S'.  Files being received with the primary 
+option 'R' can't be cancelled by the receiver.  This ensures 
+that line noise doesn't inadvertantly stop transmission.     
+
+
+                      PHONE DIRECTORY
+
+                           *****
+
+     Two types of directory formats may be set up.
+
+(a) TWO ENTRIES PER LINE
+------------------------
+
+     The directory itself begins with the letter 'A' and
+ends with the'$'.  'A' MUST BE THE FIRST CHARACTER IN THE 
+FILE. (No CR/LF pairs preceding it.)  Do not include the 
+spacing guide below.
+
+123456789012345678901234567890123456789012345678901234567890++
+
+A Apple CBBS.........499-2908  B Tony Bagshaw.......881-1532
+C Conn TRS Pick......839-4561  D Conn TRS Miss......266-9110
+E Conn TRS North Y...667-9981  F Frank Aylesworth...633-7497
+G Bill Groskuth IRN..421-1922  H Heathkit BBS ......273-3011
+I                              J K.Jeejeebhoy ......924-1517
+K Microm CBBS........226-7430  L Les Popelyak ......495-2086
+M Missisaga CBBS.....826-5394  N                            
+O                              P P.M.I.CBBS(Punter).624-5431
+Q Queens BBSNY.1-212-441-3755  R Robert L. .........621-8788
+S Sorcerer BBS 1-313-535-9186  T Tony Loutenbach ...223-9238
+U                              V                            
+W Walter Blady ......231-1898  X                            
+Y                              Z                            
+$                            ^                              ^
+^                            |                              |
+|                      (two spaces)          (carriage return
+|                                             line feed pair
+(the $ MUST be the last character)        not seen, but there)
+
+
+(b) ONE ENTRY PER LINE
+----------------------
+
+     THERE MUST BE EXACTLY 31 CHARACTERS per line, including
+the CR/LF pair.  Other than that, the rules are the same
+as the directory above.
+
+1234567890123456789012345678901
+
+A Alphons Stretch....423-1191
+B Bernice streetcar..222-0198
+C etc...n                    ^^
+$                            ||
+              (last 2 spaces rep.CR/LF pairs)
+
+
+CAUTION:
+--------
+     All NUMBERS in the directory line will be sent to 
+SMARTMODEM.  Only the numbers to be dialed should be present.
+
+
+
+
+A>
+SALLY1
+# B
+*****************************
+**    CP/M version 2.2     **
+** for ATR8000 27-April-84 **
+*****************************
+
+
+Name    Ext Bytes   Name    Ext Bytes   Name    Ext Bytes   Name    Ext Bytes
+ASM     COM    8K ! DISKDEF COM   12K ! MEMTEST DOC    3K ! STAT    COM    6K
+CONFIG  COM    4K ! DISKMON COM    7K ! MODEM   COM   11K ! SUBMIT  COM    2K
+D       COM    3K ! ED      COM    7K ! MODEM   DOC   23K ! SYSGEN  COM    1K
+DDINIT  COM    3K ! GO      COM    0K ! MOVCPM  COM   10K ! SYSTEM  SWP   16K
+DDSYSGENCOM    4K ! LOAD    COM    2K ! NEWS    DOC    8K ! TEST    DO     5K
+DDT     COM    5K ! MAKESYS DOC    2K ! PIP     COM    8K ! XSUB    COM    1K
+DISK76  COM    4K ! MEMTEST COM    1K ! READ    ME     2K
+27 File(s), occupying 158K of 188K total capacity
+35 directory entries and 30K bytes remain on A:
+A>
+
+A>
+SALLY1
+# B
+*****************************
+**    CP/M version 2.2     **
+** for ATR8000 27-April-84 **
+*****************************
+
+
+Name    Ext Bytes   Name    Ext Bytes   Name    Ext Bytes   Name    Ext Bytes
+ASM     COM    8K ! DISKDEF COM   12K ! MEMTEST DOC    3K ! STAT    COM    6K
+CONFIG  COM    4K ! DISKMON COM    7K ! MODEM   COM   11K ! SUBMIT  COM    2K
+D       COM    3K ! ED      COM    7K ! MODEM   DOC   23K ! SYSGEN  COM    1K
+DDINIT  COM    3K ! GO      COM    0K ! MOVCPM  COM   10K ! SYSTEM  SWP   16K
+DDSYSGENCOM    4K ! LOAD    COM    2K ! NEWS    DOC    8K ! TEST    DO     5K
+DDT     COM    5K ! MAKESYS DOC    2K ! PIP     COM    8K ! XSUB    COM    1K
+DISK76  COM    4K ! MEMTEST COM    1K ! READ    ME     2K
+27 File(s), occupying 158K of 188K total capacity
+35 directory entries and 30K bytes remain on A:
+A>
+SALLY1
+# 
+# 
+SALLY1
+# B
+*****************************
+**    CP/M version 2.2     **
+** for ATR8000 27-April-84 **
+*****************************
+
+
+Name    Ext Bytes   Name    Ext Bytes   Name    Ext Bytes   Name    Ext Bytes
+ASM     COM    8K ! DISKDEF COM   12K ! MEMTEST DOC    3K ! STAT    COM    6K
+CONFIG  COM    4K ! DISKMON COM    7K ! MODEM   COM   11K ! SUBMIT  COM    2K
+D       COM    3K ! ED      COM    7K ! MODEM   DOC   23K ! SYSGEN  COM    1K
+DDINIT  COM    3K ! GO      COM    0K ! MOVCPM  COM   10K ! SYSTEM  SWP   16K
+DDSYSGENCOM    4K ! LOAD    COM    2K ! NEWS    DOC    8K ! TEST    DO     5K
+DDT     COM    5K ! MAKESYS DOC    2K ! PIP     COM    8K ! XSUB    COM    1K
+DISK76  COM    4K ! MEMTEST COM    1K ! READ    ME     2K
+27 File(s), occupying 158K of 188K total capacity
+35 directory entries and 30K bytes remain on A:
+A>dir
+
+A: READ     ME  : NEWS     DOC : MAKESYS  DOC : MODEM    DOC
+A: DDSYSGEN COM : CONFIG   COM : DDINIT   COM : MODEM    COM
+A: DISKMON  COM : D        COM : PIP      COM : SUBMIT   COM
+A: XSUB     COM : ED       COM : ASM      COM : DDT      COM
+A: LOAD     COM : STAT     COM : SYSGEN   COM : DISK76   COM
+A: DISKDEF  COM : MEMTEST  COM : MEMTEST  DOC : MOVCPM   COM
+A: SYSTEM   SWP : GO       COM : TEST     DO 
+A>
+
+A>
+
+A>
+
+A>??
+SALLY1
+# B
+*****************************
+**    CP/M version 2.2     **
+** for ATR8000 27-April-84 **
+*****************************
+
+
+Name    Ext Bytes   Name    Ext Bytes   Name    Ext Bytes   Name    Ext Bytes
+ASM     COM    8K ! DISKDEF COM   12K ! MEMTEST DOC    3K ! STAT    COM    6K
+CONFIG  COM    4K ! DISKMON COM    7K ! MODEM   COM   11K ! SUBMIT  COM    2K
+D       COM    3K ! ED      COM    7K ! MODEM   DOC   23K ! SYSGEN  COM    1K
+DDINIT  COM    3K ! GO      COM    0K ! MOVCPM  COM   10K ! SYSTEM  SWP   16K
+DDSYSGENCOM    4K ! LOAD    COM    2K ! NEWS    DOC    8K ! TEST    DO     5K
+DDT     COM    5K ! MAKESYS DOC    2K ! PIP     COM    8K ! XSUB    COM    1K
+DISK76  COM    4K ! MEMTEST COM    1K ! READ    ME     2K
+27 File(s), occupying 158K of 188K total capacity
+35 directory entries and 30K bytes remain on A:
+A>dir
+
+A: READ     ME  : NEWS     DOC : MAKESYS  DOC : MODEM    DOC
+A: DDSYSGEN COM : CONFIG   COM : DDINIT   COM : MODEM    COM
+A: DISKMON  COM : D        COM : PIP      COM : SUBMIT   COM
+A: XSUB     COM : ED       COM : ASM      COM : DDT      COM
+A: LOAD     COM : STAT     COM : SYSGEN   COM : DISK76   COM
+A: DISKDEF  COM : MEMTEST  COM : MEMTEST  DOC : MOVCPM   COM
+A: SYSTEM   SWP : GO       COM : TEST     DO 
+A>
+SALLY1
+# B
+*****************************
+**    CP/M version 2.2     **
+** for ATR8000 27-April-84 **
+*****************************
+
+
+Name    Ext Bytes   Name    Ext Bytes   Name    Ext Bytes   Name    Ext Bytes
+ASM     COM    8K ! DISKDEF COM   12K ! MEMTEST DOC    3K ! STAT    COM    6K
+CONFIG  COM    4K ! DISKMON COM    7K ! MODEM   COM   11K ! SUBMIT  COM    2K
+D       COM    3K ! ED      COM    7K ! MODEM   DOC   23K ! SYSGEN  COM    1K
+DDINIT  COM    3K ! GO      COM    0K ! MOVCPM  COM   10K ! SYSTEM  SWP   16K
+DDSYSGENCOM    4K ! LOAD    COM    2K ! NEWS    DOC    8K ! TEST    DO     5K
+DDT     COM    5K ! MAKESYS DOC    2K ! PIP     COM    8K ! XSUB    COM    1K
+DISK76  COM    4K ! MEMTEST COM    1K ! READ    ME     2K
+27 File(s), occupying 158K of 188K total capacity
+35 directory entries and 30K bytes remain on A:
+A>
+
+A>^C
+A>STAT DSK
+
+
+File Not Found
+A>stat dsk:
+
+
+    A: Drive Characteristics
+ 1520: 128 Byte Record Capacity
+  190: Kilobyte Drive  Capacity
+   64: 32  Byte Directory Entries
+   64: Checked  Directory Entries
+  128: Records/ Extent
+    8: Records/ Block
+   40: Sectors/ Track
+    2: Reserved Tracks
+
+A>
+SALLY1
+# g
+ ?
+# g  ?
+# 0 ?
+# G  ?
+# 0
+ ?
+# G  ?
+# G0
+
+SALLY1
+# di ?
+# r
+ ?
+# B
+*****************************
+**    CP/M version 2.2     **
+** for ATR8000 27-April-84 **
+*****************************
+
+
+Name    Ext Bytes   Name    Ext Bytes   Name    Ext Bytes   Name    Ext Bytes
+ASM     COM    8K ! DISKDEF COM   12K ! MEMTEST DOC    3K ! STAT    COM    6K
+CONFIG  COM    4K ! DISKMON COM    7K ! MODEM   COM   11K ! SUBMIT  COM    2K
+D       COM    3K ! ED      COM    7K ! MODEM   DOC   23K ! SYSGEN  COM    1K
+DDINIT  COM    3K ! GO      COM    0K ! MOVCPM  COM   10K ! SYSTEM  SWP   16K
+DDSYSGENCOM    4K ! LOAD    COM    2K ! NEWS    DOC    8K ! TEST    DO     5K
+DDT     COM    5K ! MAKESYS DOC    2K ! PIP     COM    8K ! XSUB    COM    1K
+DISK76  COM    4K ! MEMTEST COM    1K ! READ    ME     2K
+27 File(s), occupying 158K of 188K total capacity
+35 directory entries and 30K bytes remain on A:
+A>
+SALLY1
+# B
+*****************************
+**    CP/M version 2.2     **
+** for ATR8000 27-April-84 **
+*****************************
+
+
+Name    Ext Bytes   Name    Ext Bytes   Name    Ext Bytes   Name    Ext Bytes
+ASM     COM    8K ! DISKDEF COM   12K ! MEMTEST DOC    3K ! STAT    COM    6K
+CONFIG  COM    4K ! DISKMON COM    7K ! MODEM   COM   11K ! SUBMIT  COM    2K
+D       COM    3K ! ED      COM    7K ! MODEM   DOC   23K ! SYSGEN  COM    1K
+DDINIT  COM    3K ! GO      COM    0K ! MOVCPM  COM   10K ! SYSTEM  SWP   16K
+DDSYSGENCOM    4K ! LOAD    COM    2K ! NEWS    DOC    8K ! TEST    DO     5K
+DDT     COM    5K ! MAKESYS DOC    2K ! PIP     COM    8K ! XSUB    COM    1K
+DISK76  COM    4K ! MEMTEST COM    1K ! READ    ME     2K
+27 File(s), occupying 158K of 188K total capacity
+35 directory entries and 30K bytes remain on A:
+A>dir
+
+A: READ     ME  : NEWS     DOC : MAKESYS  DOC : MODEM    DOC
+A: DDSYSGEN COM : CONFIG   COM : DDINIT   COM : MODEM    COM
+A: DISKMON  COM : D        COM : PIP      COM : SUBMIT   COM
+A: XSUB     COM : ED       COM : ASM      COM : DDT      COM
+A: LOAD     COM : STAT     COM : SYSGEN   COM : DISK76   COM
+A: DISKDEF  COM : MEMTEST  COM : MEMTEST  DOC : MOVCPM   COM
+A: SYSTEM   SWP : GO       COM : TEST     DO 
+A>
+SALLY1
+# B
+ ERR 10
+# 
+SALLY1
+# B
+ ERR 80
+# 
+SALLY1
+# B
+ ERR 10
+# B
+ ERR 10
+# 
+SALLY1
+# B
+ ERR 10
+# 
+SALLY1
+# B
+ ERR 10
+# 
+SALLY1
+# B
+ ERR 10
+# B
+ ERR 10
+# 
+SALLY1
+# B
+ ERR 10
+# B
+ ERR 10
+# 
+SALLY1
+# B
+ ERR 10
+# 
+SALLY1
+# B
+ ERR 10
+# 
+SALLY1
+# B
+ ERR 10
+# B
+ ERR 10
+# 
+SALLY1
+# B
+ ERR 10
+# 
+SALLY1
+# B
+ ERR 10
+# 
+SALLY1
+# NB ?
+# 
+# B
+ ERR 10
+# 
+SALLY1
+# 
+# 
+# B
+ ERR 10
+# 
+SALLY1
+# B
+ ERR 10
+# 
+SALLY1
+# B
+ ERR 10
+# B
+ ERR 10
+# 
+@SALLY1
+# B
+  --------  CP/M -- 2.2  --------
+
+       (c) Digital Research
+
+              for
+
+  ------   S A L L Y   1   ------
+
+
+Name    Ext Bytes   Name    Ext Bytes   Name    Ext Bytes   Name    Ext Bytes
+ASM     COM    8K ! DBASERPGOVR    4K ! INSTALL COM   32K ! SYSCOPY COM    4K
+CPMSYS  RSD   16K ! DBASESRTOVR    2K ! LOAD    COM    2K ! SYSNEW  COM    4K
+D       COM    4K ! DBASETTLOVR    2K ! MBASIC  COM   24K ! WASH    COM    8K
+DBASE   COM   18K ! DBASEUPDOVR    2K ! MERGPRINOVR    8K ! WS      COM   16K
+DBASEAPPOVR    4K ! DDT     COM    6K ! ONEDISK COM    2K ! WSMSGS  OVR   26K
+DBASEBROOVR    2K ! DELETE  COM    2K ! PIP     COM    8K ! WSOVLY1 OVR   34K
+DBASEJOIOVR    2K ! DISK    COM    4K ! SETPRINTCOM    2K ! XSUB    COM    2K
+DBASEMAIOVR    8K ! DISKDEF COM   12K ! SETTERM COM    2K ! XWS     OVL    6K
+DBASEMODOVR    4K ! DISKMON COM    8K ! SPELSTAROVR   32K
+DBASEMSCOVR    4K ! ED      COM    8K ! STAT    COM    6K
+DBASEMSGCOM    8K ! FORMAT  COM    4K ! SUBMIT  COM    2K
+41 File(s), occupying 352K of 776K total capacity
+78 directory entries and 424K bytes remain on A:
+A>dir
+
+A: D        COM : SYSNEW   COM : SYSCOPY  COM : CPMSYS   RSD
+A: PIP      COM : FORMAT   COM : DELETE   COM : ONEDISK  COM
+A: DDT      COM : ASM      COM : LOAD     COM : STAT     COM
+A: SUBMIT   COM : XSUB     COM : ED       COM : DISKDEF  COM
+A: DBASE    COM : DBASEAPP OVR : DBASEBRO OVR : DBASEJOI OVR
+A: DBASEMAI OVR : DBASEMOD OVR : DBASEMSC OVR : DBASEMSG COM
+A: DBASERPG OVR : DBASESRT OVR : DBASETTL OVR : DBASEUPD OVR
+A: WASH     COM : XWS      OVL : MBASIC   COM : SPELSTAR OVR
+A: MERGPRIN OVR : WSOVLY1  OVR : WSMSGS   OVR : WS       COM
+A: INSTALL  COM : DISKMON  COM : SETTERM  COM : SETPRINT COM
+A: DISK     COM
+A>type cp         dump cpmsys.rsd
+
+DUMP?
+
+A>ws
+
+7 7 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+"   MicroPro WordStar  release 3.00  serial # WSXPR85A      
+  COPYRIGHT (C) 1981  MicroPro International Corporation  
+
+             Lear-Siegler ADM-3A terminal     
+             Teletype-like printer            
+             No communications protocol       
+             CP/M List Output driver (LST:)   
+! "     D=Bearbeiten einer Text-Datei         H=Hilfsstufe setzen      #     N=Bearbeiten einer Programm-Datei     X=Ausgang Betriebssystem $     M=MIX-Druck einer Datei               P=Datei drucken  %     F=Inhaltsverzeichnis aus (EIN)        Y=Datei loeschen         &     L=Angemeldetes Laufwerk wechseln      O=Datei kopieren         '     R=Programm aufrufen                   E=Dateinamen aendern     (     S=SpellStar aufrufen                                        ) +!CPMSYS.RSD   XWS.OVL      ASM.COM      D.COM        DBASE.COM    DBASEMSG.COM,!DDT.COM      DELETE.COM   DISK.COM     DISKDEF.COM  DISKMON.COM  ED.COM-!FORMAT.COM   INSTALL.COM  LOAD.COM     MBASIC.COM   ONEDISK.COM  PIP.COM.!SETPRINT.COM SETTERM.COM  STAT.COM     SUBMIT.COM   SYSCOPY.COM  SYSNEW.COM/!WASH.COM     WS.COM       XSUB.COM     DBASEAPP.OVR DBASEBRO.OVR DBASEJOI.OVR0!DBASEMAI.OVR DBASEMOD.OVR DBASEMSC.OVR DBASERPG.OVR DBASESRT.OVR DBASETTL.OVR1!DBASEUPD.OVR MERGPRIN.OVR SPELSTAR.OVR WSMSGS.OVR   WSOVLY1.OVR* Inhaltsverz. von A: +Kein Text in Bearbeitung(`  s! " Zur Rechtschreib-Pruefung geben Sie den Namen des Textes ein, der geprueft # werden soll  (^R = Name der zuletzt bearbeiteten Datei).                   $ $$                                                     % Zum ueberarbeiten des Woerterbuchs geben Sie den Namen der Datei ein, die  & Worte zum Einfuegen oder zum Loeschen enthaelt                             ' '$                                                          ( + 
+
+-!                                                                        . + +!                                                                             ,     Name der Datei zum pruefen / Woerterbuch erg.? ,U                   - ,S/!CPMSYS.RSD   XWS.OVL      ASM.COM      D.COM        DBASE.COM    DBASEMSG.COM0"DT.COM      DELETE.COM   DISK.COM     DISKDEF.COM  DISKMON.COM  ED.COM      1!FORMAT.COM   INSTALL.COM  LOAD.COM     MBASIC.COM   ONEDISK.COM  PIP.COM2!SETPRINT.COM SETTERM.COM  STAT.COM     SUBMIT.COM   SYSCOPY.COM  SYSNEW.COM3!WASH.COM     WS.COM       XSUB.COM     DBASEAPP.OVR DBASEBRO.OVR DBASEJOI.OVR4!DBASEMAI.OVR DBASEMOD.OVR DBASEMSC.OVR DBASERPG.OVR DBASESRT.OVR DBASETTL.OVR5!DBASEUPD.OVR MERGPRIN.OVR SPELSTAR.OVR WSMSGS.OVR   WSOVLY1.OVR. Inhaltsverz. von A:                                                         ( ($                    ) *                    + ,S( ) ^S=Zeichen loeschen          ^Y=Eingabe loeschen          ^F=Inhaltsverzeichnis* ^D=Zeichen wiederherstellen  ^R=Eingabe wiederherstellen  ^U=Befehl loeschen  + ,S^Q^C
+         Was bitte ?? . + ,     Name der Datei zum pruefen / Woerterbuch erg.?     - ,S^Q^C
+         Was bitte ?? . + ,     Name der Datei zum pruefen / Woerterbuch erg.?     - ,S^Q^C
+         Was bitte ?? . + ,     Name der Datei zum pruefen / Woerterbuch erg.?     - ,S^Q^C
+         Was bitte ?? . + ,     Name der Datei zum pruefen / Woerterbuch erg.?     - ,S^Q
+         Was bitte ?? . + ,     Name der Datei zum pruefen / Woerterbuch erg.?   - ,S^E
+         Was bitte ?? . + ,     Name der Datei zum pruefen / Woerterbuch erg.?   - ,S^C
+         Was bitte ?? . + ,     Name der Datei zum pruefen / Woerterbuch erg.?   - ,S
+   ! "     D=Bearbeiten einer Text-Datei         H=Hilfsstufe setzen             #     N=Bearbeiten einer Programm-Datei     X=Ausgang Betriebssystem $     M=MIX-Druck einer Datei               P=Datei drucken  %     F=Inhaltsverzeichnis aus (EIN)        Y=Datei loeschen               &     L=Angemeldetes Laufwerk wechseln      O=Datei kopieren         '     R=Programm aufrufen                   E=Dateinamen aendern     (     S=SpellStar aufrufen                                        ) +!CPMSYS.RSD   XWS.OVL      ASM.COM      D.COM        DBASE.COM    DBASEMSG.COM,!DDT.COM      DELETE.COM   DISK.COM     DISKDEF.COM  DISKMON.COM  ED.COM-!FORMAT.COM   INSTALL.COM  LOAD.COM     MBASIC.COM   ONEDISK.COM  PIP.COM.  SETPRINT.COM SETTERM.COM  STAT.COM     SUBMIT.COM   SYSCOPY.COM  SYSNEW.COM/!WASH.COM     WS.COM       XSUB.COM     DBASEAPP.OVR DBASEBRO.OVR DBASEJOI.OVR0"BASEMAI.OVR DBASEMOD.OVR DBASEMSC.OVR DBASERPG.OVR DBASESRT.OVR DBASETTL.OVR1!DBASEUPD.OVR MERGPRIN.OVR SPELSTAR.OVR WSMSGS.OVR   WSOVLY1.OVR         * Inhaltsverz. von A:                                                         )                                                                                2!                                                                           3!                                                                             4!                                                                             5!                                                               (`
+SALLY1
+# B
+  --------  CP/M -- 2.2  --------
+
+       (c) Digital Research
+
+              for
+
+  ------   S A L L Y   1   ------
+
+
+Name    Ext Bytes   Name    Ext Bytes   Name    Ext Bytes   Name    Ext Bytes
+ASM     COM    8K ! DBASERPGOVR    4K ! INSTALL COM   32K ! SYSCOPY COM    4K
+CPMSYS  RSD   16K ! DBASESRTOVR    2K ! LOAD    COM    2K ! SYSNEW  COM    4K
+D       COM    4K ! DBASETTLOVR    2K ! MBASIC  COM   24K ! WASH    COM    8K
+DBASE   COM   18K ! DBASEUPDOVR    2K ! MERGPRINOVR    8K ! WS      COM   16K
+DBASEAPPOVR    4K ! DDT     COM    6K ! ONEDISK COM    2K ! WSMSGS  OVR   26K
+DBASEBROOVR    2K ! DELETE  COM    2K ! PIP     COM    8K ! WSOVLY1 OVR   34K
+DBASEJOIOVR    2K ! DISK    COM    4K ! SETPRINTCOM    2K ! XSUB    COM    2K
+DBASEMAIOVR    8K ! DISKDEF COM   12K ! SETTERM COM    2K ! XWS     OVL    6K
+DBASEMODOVR    4K ! DISKMON COM    8K ! SPELSTAROVR   32K
+DBASEMSCOVR    4K ! ED      COM    8K ! STAT    COM    6K
+DBASEMSGCOM    8K ! FORMAT  COM    4K ! SUBMIT  COM    2K
+41 File(s), occupying 352K of 776K total capacity
+78 directory entries and 424K bytes remain on A:
+A>
+SALLY1
+# B
+ ERR 10
+# B
+ ERR 10
+# B
+ ERR 10
+# 
+SALLY1
+# B
+ ERR 10
+# 
+SALLY1
+# B+ ?
+# B
+ ERR 10
+# 
+SALLY1
+# G  ?
+# 0
+ ?
+# m0
+ ?
+# m
+ ?
+# M
+0000 00 
+0001 FF 
+0002 00  
+# M1000
+1000 B4  
+# 0
+ ?
+# M0
+0000 00  
+# G
+
+SALLY1
+# B
+ ERR 10
+# B
+ ERR 10
+# 
+# 
+# 
+SALLY1
+# B
+ ERR 10
+# 
+SALLY1
+# B+ ?
+# 
+# B
+ ERR 10
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# B
+ ERR 10
+# 
+SALLY1
+# B
+ ERR 10
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# B
+ ERR 10
+# 
+SALLY1
+# 
+# B
+  --------  CP/M -- 2.2  --------
+
+       (c) Digital Research
+
+              for
+
+  ------   S A L L Y   1   ------
+
+
+Name    Ext Bytes   Name    Ext Bytes   Name    Ext Bytes   Name    Ext Bytes
+ASM     COM    8K ! DBASERPGOVR    4K ! INSTALL COM   32K ! SYSCOPY COM    4K
+CPMSYS  RSD   16K ! DBASESRTOVR    2K ! LOAD    COM    2K ! SYSNEW  COM    4K
+D       COM    4K ! DBASETTLOVR    2K ! MBASIC  COM   24K ! WASH    COM    8K
+DBASE   COM   18K ! DBASEUPDOVR    2K ! MERGPRINOVR    8K ! WS      COM   16K
+DBASEAPPOVR    4K ! DDT     COM    6K ! ONEDISK COM    2K ! WSMSGS  OVR   26K
+DBASEBROOVR    2K ! DELETE  COM    2K ! PIP     COM    8K ! WSOVLY1 OVR   34K
+DBASEJOIOVR    2K ! DISK    COM    4K ! SETPRINTCOM    2K ! XSUB    COM    2K
+DBASEMAIOVR    8K ! DISKDEF COM   12K ! SETTERM COM    2K ! XWS     OVL    6K
+DBASEMODOVR    4K ! DISKMON COM    8K ! SPELSTAROVR   32K
+DBASEMSCOVR    4K ! ED      COM    8K ! STAT    COM    6K
+DBASEMSGCOM    8K ! FORMAT  COM    4K ! SUBMIT  COM    2K
+41 File(s), occupying 352K of 776K total capacity
+78 directory entries and 424K bytes remain on A:
+A>
+
+A>
+
+A>dir
+
+A: D        COM : SYSNEW   COM : SYSCOPY  COM : CPMSYS   RSD
+A: PIP      COM : FORMAT   COM : DELETE   COM : ONEDISK  COM
+A: DDT      COM : ASM      COM : LOAD     COM : STAT     COM
+A: SUBMIT   COM : XSUB     COM : ED       COM : DISKDEF  COM
+A: DBASE    COM : DBASEAPP OVR : DBASEBRO OVR : DBASEJOI OVR
+A: DBASEMAI OVR : DBASEMOD OVR : DBASEMSC OVR : DBASEMSG COM
+A: DBASERPG OVR : DBASESRT OVR : DBASETTL OVR : DBASEUPD OVR
+A: WASH     COM : XWS      OVL : MBASIC   COM : SPELSTAR OVR
+A: MERGPRIN OVR : WSOVLY1  OVR : WSMSGS   OVR : WS       COM
+A: INSTALL  COM : DISKMON  COM : SETTERM  COM : SETPRINT COM
+A: DISK     COM
+A>
+SALLY1
+# B
+ ERR 80
+# B
+  --------  CP/M -- 2.2  --------
+
+       (c) Digital Research
+
+              for
+
+  ------   S A L L Y   1   ------
+
+
+Name    Ext Bytes   Name    Ext Bytes   Name    Ext Bytes   Name    Ext Bytes
+ASM     COM    8K ! DBASERPGOVR    4K ! INSTALL COM   32K ! SYSCOPY COM    4K
+CPMSYS  RSD   16K ! DBASESRTOVR    2K ! LOAD    COM    2K ! SYSNEW  COM    4K
+D       COM    4K ! DBASETTLOVR    2K ! MBASIC  COM   24K ! WASH    COM    8K
+DBASE   COM   18K ! DBASEUPDOVR    2K ! MERGPRINOVR    8K ! WS      COM   16K
+DBASEAPPOVR    4K ! DDT     COM    6K ! ONEDISK COM    2K ! WSMSGS  OVR   26K
+DBASEBROOVR    2K ! DELETE  COM    2K ! PIP     COM    8K ! WSOVLY1 OVR   34K
+DBASEJOIOVR    2K ! DISK    COM    4K ! SETPRINTCOM    2K ! XSUB    COM    2K
+DBASEMAIOVR    8K ! DISKDEF COM   12K ! SETTERM COM    2K ! XWS     OVL    6K
+DBASEMODOVR    4K ! DISKMON COM    8K ! SPELSTAROVR   32K
+DBASEMSCOVR    4K ! ED      COM    8K ! STAT    COM    6K
+DBASEMSGCOM    8K ! FORMAT  COM    4K ! SUBMIT  COM    2K
+41 File(s), occupying 352K of 776K total capacity
+78 directory entries and 424K bytes remain on A:
+A>
+SALLY1
+# B
+C
+SALLY1
+# B
+C
+SALLY1
+# 
+SALLY1
+# 
+# >B
+ ?
+# B
+ ERR 10
+# B
+ ERR 10
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# B
+ ERR 10
+# 
+SALLY1
+# B
+ ERR 10
+# 
+SALLY1
+# B
+ ERR 10
+# B
+ ERR 10
+# B
+ ERR 10
+# B
+ ERR 10
+# B
+ ERR 10
+# B
+ ERR 10
+# B
+ ERR 10
+# 
+# B
+ ERR 10
+# B
+ ERR 10
+# 
+SALLY1
+# B
+ ERR 10
+# 
+SALLY1
+# B# ?
+# 
+# B
+  --------  CP/M -- 2.2  --------
+
+       (c) Digital Research
+
+              for
+
+  ------   S A L L Y   1   ------
+
+
+Name    Ext Bytes   Name    Ext Bytes   Name    Ext Bytes   Name    Ext Bytes
+ASM     COM    8K ! DBASERPGOVR    4K ! INSTALL COM   32K ! SYSCOPY COM    4K
+CPMSYS  RSD   16K ! DBASESRTOVR    2K ! LOAD    COM    2K ! SYSNEW  COM    4K
+D       COM    4K ! DBASETTLOVR    2K ! MBASIC  COM   24K ! WASH    COM    8K
+DBASE   COM   18K ! DBASEUPDOVR    2K ! MERGPRINOVR    8K ! WS      COM   16K
+DBASEAPPOVR    4K ! DDT     COM    6K ! ONEDISK COM    2K ! WSMSGS  OVR   26K
+DBASEBROOVR    2K ! DELETE  COM    2K ! PIP     COM    8K ! WSOVLY1 OVR   34K
+DBASEJOIOVR    2K ! DISK    COM    4K ! SETPRINTCOM    2K ! XSUB    COM    2K
+DBASEMAIOVR    8K ! DISKDEF COM   12K ! SETTERM COM    2K ! XWS     OVL    6K
+DBASEMODOVR    4K ! DISKMON COM    8K ! SPELSTAROVR   32K
+DBASEMSCOVR    4K ! ED      COM    8K ! STAT    COM    6K
+DBASEMSGCOM    8K ! FORMAT  COM    4K ! SUBMIT  COM    2K
+41 File(s), occupying 352K of 776K total capacity
+78 directory entries and 424K bytes remain on A:
+A>stat dsk:
+
+
+    A: Drive Characteristics
+ 6240: 128 Byte Record Capacity
+  780: Kilobyte Drive  Capacity
+  128: 32  Byte Directory Entries
+  128: Checked  Directory Entries
+  128: Records/ Extent
+   16: Records/ Block
+   40: Sectors/ Track
+    4: Reserved Tracks
+
+A>__^
