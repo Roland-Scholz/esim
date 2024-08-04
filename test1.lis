@@ -1,0 +1,5 @@
+test1.asm:
+     1                          		ORG     0a200h
+     2                          
+     3   000000 cafe            		dw	0fecah
+     4                          

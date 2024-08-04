@@ -1,0 +1,65 @@
+test.asm:
+     1                          		ORG     0f000h
+     2                          
+     3                          TXD		equ	051h
+     4                          RXD		equ	050h
+     5                          printhex	equ	237h
+     6                          
+     7                          ;--------------------------------------------------------------
+     8   000000 cd1400          loop:		call	chrin
+     9   000003 cd3100          		call	chrout
+    10   000006 c30000          		jp	loop
+    11                          
+    12                          
+    13   000009 2100f0          start:		ld	hl, 0f000h
+    14   00000c cd1400          start1:		call	chrin
+    15   00000f 77              		ld	(hl), a				;7
+    16   000010 23              		inc	hl				;6
+    17   000011 c30c00          		jp	start1				;10
+    18                          
+    19   000014 c5              chrin:		push	bc
+    20   000015 d5              		push	de
+    21   000016 db50            chrin4:		in	a, (RXD)			;11	bit 7, wait for start-bit (0)
+    22   000018 17              		rla					;4
+    23   000019 38fb            		jr	c, chrin4			;12/7	22
+    24   00001b 1608            		ld	d, 8
+    25   00001d 0616            		ld	b, 22				;7
+    26   00001f 10fe            chrin1:		djnz	b, chrin1			;13/8
+    27   000021 db50            chrin3:		in	a, (RXD)			;11
+    28   000023 17              		rla					;4
+    29   000024 cb19            		rr	c				;8
+    30   000026 060d            		ld	b, 13				;7
+    31   000028 10fe            chrin2:		djnz	chrin2				;13
+    32   00002a 15              		dec	d				;4
+    33   00002b 20f4            		jr	nz, chrin3			;12/7
+    34   00002d 79              		ld	a, c				;4
+    35   00002e d1              		pop	de
+    36   00002f c1              		pop	bc
+    37   000030 c9              		ret
+    38                          
+    39   000031 c5              chrout:		push	bc
+    40   000032 d5              		push	de
+    41   000033 57              		ld	d, a
+    42   000034 af              		xor	a
+    43   000035 d351            		out	(TXD), a
+    44   000037 7a              		ld	a, d
+    45   000038 060e            		ld	b, 14
+    46   00003a 10fe            		djnz	ASMPC
+    47   00003c 0e08            		ld	c, 8
+    48   00003e d351            chrout1:	out	(TXD), a
+    49   000040 0f              		rrca
+    50   000041 060e            		ld	b, 14
+    51   000043 10fe            		djnz	ASMPC
+    52   000045 0d              		dec	c
+    53   000046 20f6            		jr	nz, chrout1
+    54   000048 3e01            		ld	a, 1
+    55   00004a d351            		out	(TXD), a
+    56   00004c 061e            		ld	b, 30
+    57   00004e 10fe            		djnz	ASMPC
+    58   000050 7a              		ld	a, d
+    59   000051 d1              		pop	de
+    60   000052 c1              		pop	bc
+    61   000053 c9              		ret
+    62                          
+    63                          
+    64                          

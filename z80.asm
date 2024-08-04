@@ -25,7 +25,9 @@
 ;
 LF		equ	0ah
 CR		equ	0dh
-TXD		equ	050h
+
+RXD		equ	050h
+TXD		equ	051h
 
 VARS		equ	0fff0h
 echo		equ	0
@@ -33,16 +35,45 @@ sum		equ	1
 addr		equ	2
 
 
-		ORG     00140h
+		ORG     0000h
 
 start:		ld	b, 0
 start1:		djnz	start1
 
 		ld	sp, VARS
+
+		ld	hl, 0				;copy 8k from 0 to 8000h
+		ld	de, 08000h
+		ld	bc, 02000h
+		ldir
 		
+		ld	hl, copy
+		set	7, h
+		jp	(hl)
+
+copy:		ld	a, 1				;switch	ROM off
+		out 	(52h), a
+		
+		ld	hl, 08000h			;copy 8k from 8000h to 0
+		ld	de, 0h
+		ld	bc, 02000h
+		ldir
+
+		ld	hl, monitor
+		res	7, h
+		jp	(hl)
+		
+monitor:	
 		include	"sallytest.asm"
 
+		
+;--------------------------------------------------
+;--------------------------------------------------
+;--------------------------------------------------
 		IFDEF exclude
+;--------------------------------------------------
+;--------------------------------------------------
+;--------------------------------------------------
 		
 		exx
 		ld	hl, 08000h

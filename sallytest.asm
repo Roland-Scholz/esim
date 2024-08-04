@@ -236,70 +236,143 @@ dumpmem4:
 		jr	NZ, dumpline
 		ret		
 
+;--------------------------------------------------------------
+; binary download to 0f000h
+;--------------------------------------------------------------
+download:	ld	hl, 0f000h
+		ld	(VARS + addr), hl
+		
+download1:	call	rs232in
+		ld	(hl), a				;7
+		inc	hl				;6
+		jp	download1			;10
+			
+rs232in:	in	a, (RXD)			;11	bit 7, wait for start-bit (0)
+		rla					;4
+		jr	c, rs232in			;12/7	22
+		nop
+		nop
+		ld	d, 8
+		ld	b, 22				;7
+		djnz	ASMPC				;13/8
+rs232in1:	in	a, (RXD)			;11
+		rla					;4
+		rr	c				;8
+		ld	b, 13				;7
+		djnz	ASMPC				;13
+		dec	d				;4
+		jr	nz, rs232in1			;12/7
+		ld	a, c				;4
+		ret
+
 
 ;--------------------------------------------------------------
 ; input char in A
 ;--------------------------------------------------------------
-chrin:		in	a, (TXD)
-		bit	3, a
-		jr	nz, chrin		;wait for start bit
-		push	bc
+chrin:		push	bc
 		push	de
-		ld	b, 8
-		call	t19200h		
-chrin1:		call	t19200
-		in	a, (TXD)
-		rra
-		rra
-		rra
-		rra
-		rr	d
-		djnz	chrin1
-		ld	a, d
+chrin4:		in	a, (RXD)			;11	bit 7, wait for start-bit (0)
+		rla					;4
+		jr	c, chrin4			;12/7	22
+		ld	d, 8
+		ld	b, 22				;7
+chrin1:		djnz	b, chrin1			;13/8
+chrin3:		in	a, (RXD)			;11
+		rla					;4
+		rr	c				;8
+		ld	b, 13				;7
+chrin2:		djnz	chrin2				;13
+		dec	d				;4
+		jr	nz, chrin3			;12/7
+		ld	a, c				;4
 		pop	de
 		pop	bc
 		ret
+
+;chrin:		in	a, (TXD)
+;		bit	3, a
+;		jr	nz, chrin		;wait for start bit
+;chrin2:		push	bc
+;		push	de
+;		ld	b, 8
+;		call	t19200h		
+;chrin1:		call	t19200
+;		in	a, (TXD)
+;		rra
+;		rra
+;		rra
+;		rra
+;		rr	d
+;		djnz	chrin1
+;		ld	a, d
+;		pop	de
+;		pop	bc
+;		ret
 		
 ;--------------------------------------------------------------
 ; output char in A
 ;--------------------------------------------------------------
-chrout:		push	bc			;4.000.000 / 19200 = 208
-		push	af
-		push	af
-		xor	a			;208 - 77 = 131
-		ld	b, 8
-		out	(TXD), a		;send start bit
-		call	t19200			
-		pop	af
-chrout1:	out	(TXD), a		;11
-		rrca				;4
-		call	t19200			;17
-		djnz	chrout1			;12		
-		ld	a, 1			;stop bit
+chrout:		push	bc
+		push	de
+		ld	d, a
+		xor	a
 		out	(TXD), a
-		call	t19200
-		pop	af
+		ld	a, d
+		ld	b, 14
+		djnz	ASMPC
+		ld	c, 8
+chrout1:	out	(TXD), a
+		rrca
+		ld	b, 14
+		djnz	ASMPC
+		dec	c
+		jr	nz, chrout1
+		ld	a, 1
+		out	(TXD), a
+		ld	b, 30
+		djnz	ASMPC
+		ld	a, d
+		pop	de
 		pop	bc
 		ret
 
-t19200h:	ld	c, 1
-		jr	t19200a
-t19200:		ld	c, 9			;7
-t19200a:	dec	c			;4
-		jr	nz, t19200a		;12
-		ret				;10
-
-time:		push	af
-		push	hl
-		ld	hl, 0
-time1:		dec	hl
-		ld	a, h
-		or	a, l
-		jr	nz, time1
-		pop	hl
-		pop	af
-		ret
-
+;chrout:		push	bc			;4.000.000 / 19200 = 208
+;		push	af
+;		push	af
+;		xor	a			;208 - 77 = 131
+;		ld	b, 8
+;		out	(TXD), a		;send start bit
+;		call	t19200			
+;		pop	af
+;chrout1:	out	(TXD), a		;11
+;		rrca				;4
+;		call	t19200			;17
+;		djnz	chrout1			;12		
+;		ld	a, 1			;stop bit
+;		out	(TXD), a
+;		call	t19200
+;		pop	af
+;		pop	bc
+;		ret
+;
+;t19200h:	ld	c, 1
+;		jr	t19200a
+;t19200:		ld	c, 9			;7
+;t19200a:	dec	c			;4
+;		jr	nz, t19200a		;12
+;		ret				;10
+;
+;time:		push	af
+;		push	hl
+;		ld	hl, 0
+;time1:		dec	hl
+;		ld	a, h
+;		or	a, l
+;		jr	nz, time1
+;		pop	hl
+;		pop	af
+;		ret
+;
 
 ;--------------------------------------------------------------
 ; gethexbyte
@@ -443,24 +516,24 @@ sallystart:	DB	32, 27, "[m", CR
 		DB	0
 		
 downtext:	DB	"downloading...", CR, 0
-downendtext:	DB	"finished.", CR, 0
+;downendtext:	DB	"finished.", CR, 0
 addrtext:	DB	"address:", 0
-errortext:	DB	"error!", 0
+;errortext:	DB	"error!", 0
 transtext:	DB	"transfer from:", 0
 lentext:	DB	" len:", 0
 totext:		DB	" to:", 0
 filltext:	DB	"fill from:", 0
 withtext:	DB	" with:", 0
-disktext:	DB	"enter disk number (0-9):",0
-filetext:	DB	CR, "filename:",0		
+;disktext:	DB	"enter disk number (0-9):",0
+;filetext:	DB	CR, "filename:",0		
 menukey:
-		DB	7
-		DB	"?CFGLMN"
+		DB	8
+		DB	"?CDFGLMN"
 
 menutab:
 		DW	questionmark
 		DW	changebyte
-;		DW	download
+		DW	download
 ;		DW	closedisk
 		DW	fillmem
 		DW	goto
@@ -479,7 +552,7 @@ menutext:
 		DB	"*************************************************", CR
 		DB	"? - This text", CR
 		DB	"C - Change byte", CR
-;		DB	"D - Download Intel Hex file", CR
+		DB	"D - Download to 0f000h", CR
 ;		DB	"E - Close Disk", CR
 		DB	"F - Fill memory", CR
 		DB	"G - Goto address", CR
