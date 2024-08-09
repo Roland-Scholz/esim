@@ -41,31 +41,33 @@ z80.asm:
     40   000000 0600            start:		ld	b, 0
     41   000002 10fe            start1:		djnz	start1
     42                          
-    43   000004 31f0ff          		ld	sp, VARS
+    43                          ;		jp	ramtest
     44                          
-    45   000007 210000          		ld	hl, 0				;copy 8k from 0 to 8000h
-    46   00000a 110080          		ld	de, 08000h
-    47   00000d 010020          		ld	bc, 02000h
-    48   000010 edb0            		ldir
-    49                          
-    50   000012 211800          		ld	hl, copy
-    51   000015 cbfc            		set	7, h
-    52   000017 e9              		jp	(hl)
-    53                          
-    54   000018 3e01            copy:		ld	a, 1				;switch	ROM off
-    55   00001a d352            		out 	(52h), a
-    56                          
-    57   00001c 210080          		ld	hl, 08000h			;copy 8k from 8000h to 0
-    58   00001f 110000          		ld	de, 0h
-    59   000022 010020          		ld	bc, 02000h
-    60   000025 edb0            		ldir
-    61                          
-    62   000027 212d00          		ld	hl, monitor
-    63   00002a cbbc            		res	7, h
-    64   00002c e9              		jp	(hl)
-    65                          
-    66                          monitor:
-    67                          		include	"sallytest.asm"
+    45   000004 31f0ff          		ld	sp, VARS
+    46                          
+    47   000007 210000          		ld	hl, 0				;copy 8k from 0 to 8000h
+    48   00000a 110080          		ld	de, 08000h
+    49   00000d 010020          		ld	bc, 02000h
+    50   000010 edb0            		ldir
+    51                          
+    52   000012 211800          		ld	hl, copy
+    53   000015 cbfc            		set	7, h
+    54   000017 e9              		jp	(hl)
+    55                          
+    56   000018 3e01            copy:		ld	a, 1				;switch	ROM off
+    57   00001a d352            		out 	(52h), a
+    58                          
+    59   00001c 210080          		ld	hl, 08000h			;copy 8k from 8000h to 0
+    60   00001f 110000          		ld	de, 0h
+    61   000022 010020          		ld	bc, 02000h
+    62   000025 edb0            		ldir
+    63                          
+    64   000027 212d00          		ld	hl, monitor
+    65   00002a cbbc            		res	7, h
+    66   00002c e9              		jp	(hl)
+    67                          
+    68                          monitor:
+    69                          		include	"sallytest.asm"
 sallytest.asm:
      1                          conout		equ	chrout
      2                          conin		equ	chrin
@@ -1406,107 +1408,130 @@ C:/github/FABIAN/src/disz80.asm:
 sallytest.asm:
    570                          
 z80.asm:
-    68                          
-    69                          
-    70                          ;--------------------------------------------------
-    71                          ;--------------------------------------------------
+    70                          
+    71                          
     72                          ;--------------------------------------------------
-    73                          		IFDEF exclude
+    73                          ;--------------------------------------------------
     74                          ;--------------------------------------------------
-    75                          ;--------------------------------------------------
+    75                          		IFDEF exclude
     76                          ;--------------------------------------------------
-    77                          
-    78                          		exx
-    79                          		ld	hl, 08000h
-    80                          		exx
-    81                          
-    82                          		ld	a, 1
-    83                          		out	(050h), a
-    84                          
-    85                          
-    86                          		ld	c, 0
-    87                          		ld	hl, 08000h
-    88                          start2:		ld	(hl), c
-    89                          		dec	c
-    90                          		inc	hl
-    91                          		ld	a, h
-    92                          		or	a, l
-    93                          		jp	nz, start2
-    94                          
-    95                          		ld	a, 10
-    96                          		ld	hl, start5
-    97                          		jp	putchar
-    98                          
-    99                          start5:		ld	d, 16
-   100                          start4:		ld	e, 16
-   101                          start3:		jp	puthex
-   102                          label1:		exx
-   103                          		inc	hl
-   104                          		exx
-   105                          		ld	a, ' '
-   106                          		ld	hl, label2
-   107                          		jp	putchar
-   108                          label2:		dec	e
-   109                          		jp	nz, start3
-   110                          newline:	ld	a, 10
-   111                          		ld	hl, label3
-   112                          		jp	putchar
-   113                          label3:		dec	d
-   114                          		jp	nz, start4
-   115                          
-   116                          		ld	hl, end
-   117                          		ld	a, 10
-   118                          		jp	putchar
-   119                          end:		jp	start5
-   120                          
-   121                          puthex:		exx
-   122                          		ld	a, (hl)
-   123                          		exx
-   124                          		rra
-   125                          		rra
-   126                          		rra
-   127                          		rra
-   128                          		and	15
-   129                          		cp	10
-   130                          		jr	c, putnib1
-   131                          		add	7
-   132                          putnib1:	add	'0'
-   133                          		ld	hl, putnib2
-   134                          		jp	putchar
-   135                          putnib2:	exx
-   136                          		ld	a, (hl)
-   137                          		exx
-   138                          		and	15
-   139                          		cp	10
-   140                          		jr	c, putnib3
-   141                          		add	7
-   142                          putnib3:	add	'0'
-   143                          		ld	hl, label1
-   144                          
-   145                          putchar:	or	a
-   146                          		rla
-   147                          		ld	c, 8
-   148                          		out	(050h), a
+    77                          ;--------------------------------------------------
+    78                          ;--------------------------------------------------
+    79                          
+    80                          ramtest:
+    81                          		ld	a, 1				;stop bit
+    82                          		out	(TXD), a
+    83                          
+    84                          		ld	a, 0aah
+    85                          ;ramtest4:	ld	e, 10
+    86                          ;
+    87                          ;ramtest2:	out	(30h), a
+    88                          ;		ld	d, a
+    89                          ;ramtest1:	inc	bc
+    90                          ;		ld	a, b
+    91                          ;		or	c
+    92                          ;		jnz	ramtest1
+    93                          ;		ld	a, d
+    94                          ;		cpl	a
+    95                          ;		dec	e
+    96                          ;		jr	nz, ramtest2
+    97                          ;
+    98                          ;		ld	a, 'A'
+    99                          ;		ld	hl, ramtest3
+   100                          ;		jp	putchar
+   101                          ;
+   102                          ;ramtest3:	ld	a, 1
+   103                          ;		jp 	ramtest4
+   104                          
+   105                          
+   106                          
+   107                          		exx
+   108                          		ld	hl, 08000h
+   109                          		exx
+   110                          
+   111                          		ld	c, 0
+   112                          		ld	hl, 08000h
+   113                          start2:		ld	(hl), c
+   114                          		dec	c
+   115                          		inc	hl
+   116                          		ld	a, h
+   117                          		or	a, l
+   118                          		jp	nz, start2
+   119                          
+   120                          		ld	a, 10
+   121                          		ld	hl, start5
+   122                          		jp	putchar
+   123                          
+   124                          start5:		ld	d, 16
+   125                          start4:		ld	e, 16
+   126                          start3:		jp	puthex
+   127                          label1:		exx
+   128                          		inc	hl
+   129                          		exx
+   130                          		ld	a, ' '
+   131                          		ld	hl, label2
+   132                          		jp	putchar
+   133                          label2:		dec	e
+   134                          		jp	nz, start3
+   135                          newline:	ld	a, 10
+   136                          		ld	hl, label3
+   137                          		jp	putchar
+   138                          label3:		dec	d
+   139                          		jp	nz, start4
+   140                          
+   141                          		ld	hl, end
+   142                          		ld	a, 10
+   143                          		jp	putchar
+   144                          end:		jp	start5
+   145                          
+   146                          puthex:		exx
+   147                          		ld	a, (hl)
+   148                          		exx
    149                          		rra
-   150                          		ld	b, 14
-   151                          loop0:		djnz	b, loop0
-   152                          loop2:		out	(050h), a
-   153                          		rrca
-   154                          		ld	b, 14
-   155                          loop1:		djnz	loop1
-   156                          		dec	c
-   157                          		jp	nz, loop2
-   158                          		or	a
-   159                          		ccf
-   160                          		rla
-   161                          		out	(050h), a
-   162                          		rra
-   163                          		ld	b, 15
-   164                          loop5:		djnz	loop5
-   165                          		jp	(hl)
-   166                          
-   167                          
-   168                          test:		ret
+   150                          		rra
+   151                          		rra
+   152                          		rra
+   153                          		and	15
+   154                          		cp	10
+   155                          		jr	c, putnib1
+   156                          		add	7
+   157                          putnib1:	add	'0'
+   158                          		ld	hl, putnib2
+   159                          		jp	putchar
+   160                          putnib2:	exx
+   161                          		ld	a, (hl)
+   162                          		exx
+   163                          		and	15
+   164                          		cp	10
+   165                          		jr	c, putnib3
+   166                          		add	7
+   167                          putnib3:	add	'0'
+   168                          		ld	hl, label1
    169                          
-   170                          		ENDIF
-   171                          
+   170                          putchar:	or	a
+   171                          		rla
+   172                          		ld	c, 8
+   173                          		out	(TXD), a
+   174                          		rra
+   175                          		ld	b, 14
+   176                          loop0:		djnz	b, loop0
+   177                          loop2:		out	(TXD), a
+   178                          		rrca
+   179                          		ld	b, 14
+   180                          loop1:		djnz	loop1
+   181                          		dec	c
+   182                          		jp	nz, loop2
+   183                          		or	a
+   184                          		ccf
+   185                          		rla
+   186                          		out	(TXD), a
+   187                          		rra
+   188                          		ld	b, 15
+   189                          loop5:		djnz	loop5
+   190                          		jp	(hl)
+   191                          
+   192                          
+   193                          test:		ret
+   194                          
+   195                          		ENDIF
+   196                          

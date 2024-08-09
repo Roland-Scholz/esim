@@ -40,6 +40,8 @@ addr		equ	2
 start:		ld	b, 0
 start1:		djnz	start1
 
+;		jp	ramtest
+		
 		ld	sp, VARS
 
 		ld	hl, 0				;copy 8k from 0 to 8000h
@@ -75,13 +77,36 @@ monitor:
 ;--------------------------------------------------
 ;--------------------------------------------------
 		
+ramtest:
+		ld	a, 1				;stop bit
+		out	(TXD), a
+		
+		ld	a, 0aah
+;ramtest4:	ld	e, 10
+;		
+;ramtest2:	out	(30h), a
+;		ld	d, a
+;ramtest1:	inc	bc
+;		ld	a, b
+;		or	c
+;		jnz	ramtest1
+;		ld	a, d
+;		cpl	a
+;		dec	e
+;		jr	nz, ramtest2
+;
+;		ld	a, 'A'
+;		ld	hl, ramtest3
+;		jp	putchar
+;
+;ramtest3:	ld	a, 1
+;		jp 	ramtest4
+
+
+
 		exx
 		ld	hl, 08000h
 		exx
-		
-		ld	a, 1
-		out	(050h), a
-		
 	
 		ld	c, 0
 		ld	hl, 08000h
@@ -145,11 +170,11 @@ putnib3:	add	'0'
 putchar:	or	a
 		rla
 		ld	c, 8
-		out	(050h), a
+		out	(TXD), a
 		rra
 		ld	b, 14
 loop0:		djnz	b, loop0
-loop2:		out	(050h), a
+loop2:		out	(TXD), a
 		rrca	
 		ld	b, 14
 loop1:		djnz	loop1
@@ -158,7 +183,7 @@ loop1:		djnz	loop1
 		or	a
 		ccf
 		rla
-		out	(050h), a
+		out	(TXD), a
 		rra
 		ld	b, 15
 loop5:		djnz	loop5

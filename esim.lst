@@ -167,26 +167,26 @@ ASEM-51 V1.3                                         Copyright (c) 2002 by W.W. 
   133: 1	N      0062	cin_filter	EQU 0062h		;like cin, but scan for arrow keys, pgup/pgdn
   134: 1	N      0065	asc2hex		EQU 0065h		;convert character 0-9,A-F to number 0-15.
   135:
-  136:		B      00B2	WRITEREG	EQU	P3.2			;violett
-  137:		B      00B3	REGA		EQU	P3.3			;gray
-  138:		B      00B4	REGB		EQU	P3.4			;violett
-  139:		B      00B5	WRITERAM	EQU	P3.5			;green
+  136:				;WRITEREG	EQU	P3.2			;violett
+  137:				;REGA		EQU	P3.3			;gray
+  138:				;REGB		EQU	P3.4			;violett
+  139:				;WRITERAM	EQU	P3.5			;green
   140:
-  141:				; REGB	REGA	register
-  142:				; 0	0	ADRHI
-  143:				; 0	1	ADRLO
-  144:				; 1	0	DATA
-  145:				; 1	1	ESIMENABLE
-  146:
-  147:		D      0082	dpl		EQU	dp0l
-  148:		D      0083	dph		EQU	dp0h
-  149:
-  150:		N      8000	LOCAT		EQU	08000h
+  141:		B      00B2	RAMCE		EQU	P3.2			;RAM CE signal
+  142:		B      00B3	RAMWE		EQU	P3.3			;RAM write signal
+  143:		B      00B4	SIM		EQU	P3.4			;0 = SIM, 1=write RAM
+  144:
+  145:
+  146:				; REGB	REGA	register
+  147:				; 0	0	ADRHI
+  148:				; 0	1	ADRLO
+  149:				; 1	0	DATA
+  150:				; 1	1	ESIMENABLE
   151:
-  152:				;		ORG	8000h
-  153:
-  154:		N      8000			ORG    LOCAT
-  155:	  8000	A5 E5 E0 A5			DB     0A5H,0E5H,0E0H,0A5H     ;SIGNITURE BYTES
+  152:		D      0082	dpl		EQU	dp0l
+  153:		D      0083	dph		EQU	dp0h
+  154:
+  155:		N      1000	LOCAT		EQU	01000h
 
 ASEM-51 V1.3                                         Copyright (c) 2002 by W.W. Heinz                                         PAGE 4
 
@@ -194,62 +194,62 @@ ASEM-51 V1.3                                         Copyright (c) 2002 by W.W. 
 
  Line  I  Addr  Code            Source
 
-  156:	  8004	23 00 00 00			DB     35,0,0,0                ;ID (35=PROG), id (253=startup)
-  157:	  8008	00 00 00 00			DB     0,0,0,0                 ;PROMPT CODE VECTOR
-  158:	  800C	00 00 00 00			DB     0,0,0,0                 ;RESERVED
-  159:	  8010	00 00 00 00			DB     0,0,0,0                 ;RESERVED
-  160:	  8014	00 00 00 00			DB     0,0,0,0                 ;RESERVED
-  161:	  8018	00 00 00 00			DB     0,0,0,0                 ;USER DEFINED
-  162:	  801C	FF FF FF FF			DB     255,255,255,255         ;LENGTH AND CHECKSUM (255=UNUSED)
-  163:	  8020	45 70 72 6F			DB     "Eprom Simulator 8k",0  ;MAX 31 CHARACTERS, PLUS THE ZERO
-	  8024	6D 20 53 69
-	  8028	6D 75 6C 61
-	  802C	74 6F 72 20
-	  8030	38 6B 00
-  164:
-  165:		N      8040			ORG    LOCAT+64                ;EXECUTABLE CODE BEGINS HERE
-  166:
-  167:	  8040	11 56				ACALL	INITPORTS
-  168:
-  169:	  8042	90 82 41	MENU:		MOV	DPTR,#MSGMENU
-  170:	  8045	12 00 38			CALL	PSTR
-  171:	  8048	12 00 32	MENULOOP:	CALL	CIN
-  172:	  804B	B4 64 04	MENUD:		CJNE	A,#"d",MENUX
-  173:	  804E	11 8A				ACALL	WRITEHEX
-  174:	  8050	01 42				AJMP	MENU
-  175:	  8052	B4 78 F3	MENUX:		CJNE	A,#"x",MENULOOP
-  176:	  8055	22				RET
-  177:
-  178:	  8056	75 B0 FF	INITPORTS:	MOV	P3, #255
-  179:	  8059	74 01				MOV	A, #1
-  180:	  805B	11 7F				ACALL	ESIMENABLE
-  181:	  805D	E4				CLR	A
-  182:	  805E	11 72				ACALL	WRITEADRLO
-  183:	  8060	11 6C				ACALL	WRITEADRHI
-  184:	  8062	11 78				ACALL	WRITEDATA
-  185:	  8064	C2 B5				CLR	WRITERAM
-  186:	  8066	D2 B5				SETB	WRITERAM
-  187:	  8068	E4				CLR	A
-  188:	  8069	11 7F				ACALL	ESIMENABLE
-  189:	  806B	22				RET
-  190:
-  191:	  806C	C2 B3		WRITEADRHI:	CLR	REGA
-  192:	  806E	C2 B4				CLR	REGB
-  193:	  8070	01 83				AJMP	REGSTROBE
-  194:
-  195:	  8072	D2 B3		WRITEADRLO:	SETB	REGA
-  196:	  8074	C2 B4				CLR	REGB
-  197:	  8076	01 83				AJMP	REGSTROBE
-  198:
-  199:	  8078	C2 B3		WRITEDATA:	CLR	REGA
-  200:	  807A	00				NOP
-  201:	  807B	D2 B4				SETB	REGB
-  202:	  807D	01 83				AJMP	REGSTROBE
-  203:
-  204:	  807F	D2 B3		ESIMENABLE:	SETB	REGA
-  205:	  8081	D2 B4				SETB	REGB
-  206:
-  207:	  8083	F5 90		REGSTROBE:	MOV	P1,A
+  156:
+  157:				;		ORG	1000h
+  158:
+  159:		N      1000			ORG    LOCAT
+  160:	  1000	A5 E5 E0 A5			DB     0A5H,0E5H,0E0H,0A5H     ;SIGNITURE BYTES
+  161:	  1004	23 00 00 00			DB     35,0,0,0                ;ID (35=PROG), id (253=startup)
+  162:	  1008	00 00 00 00			DB     0,0,0,0                 ;PROMPT CODE VECTOR
+  163:	  100C	00 00 00 00			DB     0,0,0,0                 ;RESERVED
+  164:	  1010	00 00 00 00			DB     0,0,0,0                 ;RESERVED
+  165:	  1014	00 00 00 00			DB     0,0,0,0                 ;RESERVED
+  166:	  1018	00 00 00 00			DB     0,0,0,0                 ;USER DEFINED
+  167:	  101C	FF FF FF FF			DB     255,255,255,255         ;LENGTH AND CHECKSUM (255=UNUSED)
+  168:	  1020	45 70 72 6F			DB     "Eprom Simulator 8k",0  ;MAX 31 CHARACTERS, PLUS THE ZERO
+	  1024	6D 20 53 69
+	  1028	6D 75 6C 61
+	  102C	74 6F 72 20
+	  1030	38 6B 00
+  169:
+  170:		N      1040			ORG    LOCAT+64                ;EXECUTABLE CODE BEGINS HERE
+  171:
+  172:	  1040	11 56				ACALL	INITPORTS
+  173:
+  174:	  1042	90 12 26	MENU:		MOV	DPTR,#MSGMENU
+  175:	  1045	12 00 38			CALL	PSTR
+  176:	  1048	12 00 32	MENULOOP:	CALL	CIN
+  177:	  104B	B4 64 04	MENUD:		CJNE	A,#"d",MENUX
+  178:	  104E	11 72				ACALL	WRITEHEX
+  179:	  1050	01 42				AJMP	MENU
+  180:	  1052	B4 78 F3	MENUX:		CJNE	A,#"x",MENULOOP
+  181:	  1055	22				RET
+  182:
+  183:	  1056	75 80 FF	INITPORTS:	MOV	P0, #255
+  184:	  1059	75 90 FF			MOV	P1, #255
+  185:	  105C	75 A0 FF			MOV	P2, #255
+  186:	  105F	75 B0 FF			MOV	P3, #255
+  187:	  1062	C2 B4				CLR	SIM
+  188:	  1064	22				RET
+  189:
+  190:	  1065	F5 A0		WRITEADRHI:	MOV	P2, A
+  191:	  1067	22				RET
+  192:
+  193:	  1068	F5 90		WRITEADRLO:	MOV	P1, A
+  194:	  106A	22				RET
+  195:
+  196:	  106B	F5 80		WRITEDATA:	MOV	P0, A
+  197:	  106D	C2 B3				CLR	RAMWE
+  198:	  106F	D2 B3				SETB	RAMWE
+  199:	  1071	22				RET
+  200:
+  201:
+  202:	  1072	75 B0 FF	WRITEHEX:	MOV	P3, #255		;enable ESIM
+  203:	  1075	C2 B2				CLR	RAMCE
+  204:	  1077	11 7D				ACALL	dnld
+  205:	  1079	D2 B2				SETB	RAMCE
+  206:	  107B	01 56				AJMP	INITPORTS
+  207:
 
 ASEM-51 V1.3                                         Copyright (c) 2002 by W.W. Heinz                                         PAGE 5
 
@@ -257,62 +257,62 @@ ASEM-51 V1.3                                         Copyright (c) 2002 by W.W. 
 
  Line  I  Addr  Code            Source
 
-  208:	  8085	C2 B2				CLR	WRITEREG
-  209:	  8087	D2 B2				SETB	WRITEREG
-  210:	  8089	22				RET
-  211:
-  212:	  808A	74 01		WRITEHEX:	MOV	A,#1
-  213:	  808C	11 7F				ACALL	ESIMENABLE
-  214:	  808E	11 94				ACALL	dnld
-  215:	  8090	74 00				MOV	A,#0
-  216:	  8092	01 7F				AJMP	ESIMENABLE
-  217:
-  218:	  8094			dnld:
-  219:	  8094	90 82 7D			mov	dptr, #dnlds1
-  220:	  8097	12 00 45			call	pcstr_h		   ;"begin sending file <ESC> to abort"
-  221:	  809A	51 21				acall	dnld_init
-  222:
-  223:					  ;look for begining of line marker ':'
-  224:	  809C	12 00 32	dnld1:		call	cin
-  225:	  809F	B4 1B 02			cjne	a, #27, dnld2	;Test for escape
-  226:	  80A2	21 31				ajmp	dnld_esc
+  208:
+  209:	  107D			dnld:
+  210:	  107D	90 12 62			mov	dptr, #dnlds1
+  211:	  1080	12 00 45			call	pcstr_h		   ;"begin sending file <ESC> to abort"
+  212:	  1083	51 06				acall	dnld_init
+  213:
+  214:					  ;look for begining of line marker ':'
+  215:	  1085	12 00 32	dnld1:		call	cin
+  216:	  1088	B4 1B 02			cjne	a, #27, dnld2	;Test for escape
+  217:	  108B	21 16				ajmp	dnld_esc
+  218:
+  219:	  108D	B4 3A 02	dnld2:		cjne	a, #':', dnld2b
+  220:	  1090	80 12				sjmp	dnld2d
+  221:	  1092			dnld2b:	  ;check to see if it's a hex digit, error if it is
+  222:	  1092	12 00 65			call	asc2hex
+  223:	  1095	40 EE				jc	dnld1
+  224:	  1097	79 06				mov	r1, #6
+  225:	  1099	31 29				acall	dnld_inc
+  226:	  109B	80 E8				sjmp	dnld1
   227:
-  228:	  80A4	B4 3A 02	dnld2:		cjne	a, #':', dnld2b
-  229:	  80A7	80 12				sjmp	dnld2d
-  230:	  80A9			dnld2b:	  ;check to see if it's a hex digit, error if it is
-  231:	  80A9	12 00 65			call	asc2hex
-  232:	  80AC	40 EE				jc	dnld1
-  233:	  80AE	79 06				mov	r1, #6
-  234:	  80B0	31 44				acall	dnld_inc
-  235:	  80B2	80 E8				sjmp	dnld1
-  236:
-  237:	  80B4			dnld_now: ;entry point for main menu detecting ":" character
-  238:	  80B4	74 5E				mov	a, #'^'
-  239:	  80B6	12 00 30			call	cout
-  240:	  80B9	51 21				acall	dnld_init
-  241:
-  242:	  80BB	79 00		dnld2d:		mov	r1, #0
-  243:	  80BD	31 44				acall	dnld_inc
-  244:
-  245:					  ;begin taking in the line of data
-  246:	  80BF	74 2E		dnld3:		mov	a, #'.'
-  247:	  80C1	12 00 30			call	cout
-  248:	  80C4	7C 00				mov	r4, #0		;r4 will count up checksum
-  249:	  80C6	31 63				acall	dnld_ghex
-  250:	  80C8	F8				mov	r0, a		;R0 = # of data bytes
-  251:				;	mov	a, #'.'
-  252:				;	acall	cout
-  253:	  80C9	31 63				acall	dnld_ghex
-  254:	  80CB	F5 83		dnld3_b:	mov	dp0h, a		;High byte of load address
-  255:	  80CD	31 63				acall	dnld_ghex
-  256:	  80CF	F5 82				mov	dp0l, a		;Low byte of load address
-  257:	  80D1	31 63				acall	dnld_ghex	;Record type
-  258:	  80D3	B4 01 02			cjne	a, #1, dnld4	;End record?
-  259:	  80D6	80 3B				sjmp	dnld_end
-  260:	  80D8	70 30		dnld4:		jnz	dnld_unknown	;is it a unknown record type???
-  261:	  80DA	E8		dnld5:		mov	a, r0
-  262:	  80DB	60 1F				jz	dnld_get_cksum
-  263:	  80DD	31 63				acall	dnld_ghex	;Get data byte
+  228:	  109D			dnld_now: ;entry point for main menu detecting ":" character
+  229:	  109D	74 5E				mov	a, #'^'
+  230:	  109F	12 00 30			call	cout
+  231:	  10A2	51 06				acall	dnld_init
+  232:
+  233:	  10A4	79 00		dnld2d:		mov	r1, #0
+  234:	  10A6	31 29				acall	dnld_inc
+  235:
+  236:					  ;begin taking in the line of data
+  237:	  10A8	74 2E		dnld3:		mov	a, #'.'
+  238:	  10AA	12 00 30			call	cout
+  239:	  10AD	7C 00				mov	r4, #0		;r4 will count up checksum
+  240:	  10AF	31 48				acall	dnld_ghex
+  241:	  10B1	F8				mov	r0, a		;R0 = # of data bytes
+  242:				;	mov	a, #'.'
+  243:				;	acall	cout
+  244:	  10B2	31 48				acall	dnld_ghex
+  245:	  10B4	F5 83		dnld3_b:	mov	dp0h, a		;High byte of load address
+  246:	  10B6	31 48				acall	dnld_ghex
+  247:	  10B8	F5 82				mov	dp0l, a		;Low byte of load address
+  248:	  10BA	31 48				acall	dnld_ghex	;Record type
+  249:	  10BC	B4 01 02			cjne	a, #1, dnld4	;End record?
+  250:	  10BF	80 37				sjmp	dnld_end
+  251:	  10C1	70 2C		dnld4:		jnz	dnld_unknown	;is it a unknown record type???
+  252:	  10C3	E8		dnld5:		mov	a, r0
+  253:	  10C4	60 1B				jz	dnld_get_cksum
+  254:	  10C6	31 48				acall	dnld_ghex	;Get data byte
+  255:	  10C8	FA				mov	r2, a
+  256:	  10C9	79 01				mov	r1, #1
+  257:	  10CB	31 29				acall	dnld_inc	;count total data bytes received
+  258:
+  259:						;lcall	smart_wr	;c=1 if an error writing
+  260:	  10CD	E5 82				MOV	A, dp0l
+  261:	  10CF	11 68				ACALL	WRITEADRLO
+  262:	  10D1	E5 83				MOV	A, dp0h
+  263:	  10D3	11 65				ACALL	WRITEADRHI
 
 ASEM-51 V1.3                                         Copyright (c) 2002 by W.W. Heinz                                         PAGE 6
 
@@ -320,62 +320,62 @@ ASEM-51 V1.3                                         Copyright (c) 2002 by W.W. 
 
  Line  I  Addr  Code            Source
 
-  264:	  80DF	FA				mov	r2, a
-  265:	  80E0	79 01				mov	r1, #1
-  266:	  80E2	31 44				acall	dnld_inc	;count total data bytes received
-  267:	  80E4	EA				mov	a, r2
-  268:
-  269:						;lcall	smart_wr	;c=1 if an error writing
-  270:	  80E5	11 78				ACALL	WRITEDATA
-  271:	  80E7	E5 82				MOV	A, dp0l
-  272:	  80E9	11 72				ACALL	WRITEADRLO
-  273:	  80EB	E5 83				MOV	A, dp0h
-  274:	  80ED	11 6C				ACALL	WRITEADRHI
-  275:	  80EF	C2 B5				CLR	WRITERAM
-  276:	  80F1	D2 B5				SETB	WRITERAM
-  277:
-  278:	  80F3	E4				clr	a
-  279:	  80F4	34 02				addc	a, #2
-  280:	  80F6	F9				mov	r1, a
-  281:				;     2 = bytes written
-  282:				;     3 = bytes unable to write
-  283:	  80F7	31 44				acall	dnld_inc
-  284:	  80F9	A3				inc	dptr
-  285:	  80FA	D8 DE				djnz	r0, dnld5
-  286:	  80FC			dnld_get_cksum:
-  287:	  80FC	31 63				acall	dnld_ghex	;get checksum
-  288:	  80FE	EC				mov	a, r4
-  289:	  80FF	60 9B				jz	dnld1		;should always add to zero
-  290:	  8101			dnld_sumerr:
-  291:	  8101	12 00 34			CALL	PHEX
-  292:	  8104	79 04				mov	r1, #4
-  293:	  8106	31 44				acall	dnld_inc	;all we can do it count # of cksum errors
-  294:	  8108	80 92				sjmp	dnld1
-  295:
-  296:	  810A			dnld_unknown:	;handle unknown line type
-  297:	  810A	E8				mov	a, r0
-  298:	  810B	60 EF				jz	dnld_get_cksum	;skip data if size is zero
-  299:	  810D			dnld_ukn2:
-  300:	  810D	31 63				acall	dnld_ghex	;consume all of unknown data
-  301:	  810F	D8 FC				djnz	r0, dnld_ukn2
-  302:	  8111	80 E9				sjmp	dnld_get_cksum
-  303:
-  304:	  8113			dnld_end:   ;handles the proper end-of-download marker
-  305:	  8113	E8				mov	a, r0
-  306:	  8114	60 04				jz	dnld_end_3	;should usually be zero
-  307:	  8116			dnld_end_2:
-  308:	  8116	31 63				acall	dnld_ghex	;consume all of useless data
-  309:	  8118	D8 F3				djnz	r0, dnld_ukn2
-  310:	  811A			dnld_end_3:
-  311:	  811A	31 63				acall	dnld_ghex	;get the last checksum
-  312:	  811C	EC				mov	a, r4
-  313:	  811D	70 E2				jnz	dnld_sumerr
-  314:	  811F	31 3B				acall	dnld_dly
-  315:	  8121	90 82 9C			mov	dptr, #dnlds3
-  316:	  8124	12 00 45			call	pcstr_h		   ;"download went ok..."
-  317:					;consume any cr or lf character that may have been
-  318:					;on the end of the last line
-  319:	  8127	20 98 02			jb	ri, dnld_end_4
+  264:	  10D5	EA				mov	a, r2
+  265:	  10D6	11 6B				ACALL	WRITEDATA
+  266:
+  267:	  10D8	E4				clr	a
+  268:	  10D9	34 02				addc	a, #2
+  269:	  10DB	F9				mov	r1, a
+  270:				;     2 = bytes written
+  271:				;     3 = bytes unable to write
+  272:	  10DC	31 29				acall	dnld_inc
+  273:	  10DE	A3				inc	dptr
+  274:	  10DF	D8 E2				djnz	r0, dnld5
+  275:	  10E1			dnld_get_cksum:
+  276:	  10E1	31 48				acall	dnld_ghex	;get checksum
+  277:	  10E3	EC				mov	a, r4
+  278:	  10E4	60 9F				jz	dnld1		;should always add to zero
+  279:	  10E6			dnld_sumerr:
+  280:	  10E6	12 00 34			CALL	PHEX
+  281:	  10E9	79 04				mov	r1, #4
+  282:	  10EB	31 29				acall	dnld_inc	;all we can do it count # of cksum errors
+  283:	  10ED	80 96				sjmp	dnld1
+  284:
+  285:	  10EF			dnld_unknown:	;handle unknown line type
+  286:	  10EF	E8				mov	a, r0
+  287:	  10F0	60 EF				jz	dnld_get_cksum	;skip data if size is zero
+  288:	  10F2			dnld_ukn2:
+  289:	  10F2	31 48				acall	dnld_ghex	;consume all of unknown data
+  290:	  10F4	D8 FC				djnz	r0, dnld_ukn2
+  291:	  10F6	80 E9				sjmp	dnld_get_cksum
+  292:
+  293:	  10F8			dnld_end:   ;handles the proper end-of-download marker
+  294:	  10F8	E8				mov	a, r0
+  295:	  10F9	60 04				jz	dnld_end_3	;should usually be zero
+  296:	  10FB			dnld_end_2:
+  297:	  10FB	31 48				acall	dnld_ghex	;consume all of useless data
+  298:	  10FD	D8 F3				djnz	r0, dnld_ukn2
+  299:	  10FF			dnld_end_3:
+  300:	  10FF	31 48				acall	dnld_ghex	;get the last checksum
+  301:	  1101	EC				mov	a, r4
+  302:	  1102	70 E2				jnz	dnld_sumerr
+  303:	  1104	31 20				acall	dnld_dly
+  304:	  1106	90 12 81			mov	dptr, #dnlds3
+  305:	  1109	12 00 45			call	pcstr_h		   ;"download went ok..."
+  306:					;consume any cr or lf character that may have been
+  307:					;on the end of the last line
+  308:	  110C	20 98 02			jb	ri, dnld_end_4
+  309:	  110F	21 93				ajmp	dnld_sum
+  310:	  1111			dnld_end_4:
+  311:	  1111	12 00 32			call	cin
+  312:	  1114	80 7D				sjmp	dnld_sum
+  313:
+  314:
+  315:
+  316:	  1116			dnld_esc:   ;handle esc received in the download stream
+  317:	  1116	31 20				acall	dnld_dly
+  318:	  1118	90 12 79			mov	dptr, #dnlds2
+  319:	  111B	12 00 45			call	pcstr_h		   ;"download aborted."
 
 ASEM-51 V1.3                                         Copyright (c) 2002 by W.W. Heinz                                         PAGE 7
 
@@ -383,62 +383,62 @@ ASEM-51 V1.3                                         Copyright (c) 2002 by W.W. 
 
  Line  I  Addr  Code            Source
 
-  320:	  812A	21 AE				ajmp	dnld_sum
-  321:	  812C			dnld_end_4:
-  322:	  812C	12 00 32			call	cin
-  323:	  812F	80 7D				sjmp	dnld_sum
-  324:
-  325:
-  326:
-  327:	  8131			dnld_esc:   ;handle esc received in the download stream
-  328:	  8131	31 3B				acall	dnld_dly
-  329:	  8133	90 82 94			mov	dptr, #dnlds2
-  330:	  8136	12 00 45			call	pcstr_h		   ;"download aborted."
-  331:	  8139	80 73				sjmp	dnld_sum
-  332:
-  333:	  813B			dnld_dly:   ;a short delay since most terminal emulation programs
-  334:					    ;won't be ready to receive anything immediately after
-  335:					    ;they've transmitted a file... even on a fast Pentium(tm)
-  336:					    ;machine with 16550 uarts!
-  337:	  813B	78 00				mov	R0,#0
-  338:	  813D	79 00		dnlddly2:	mov	R1,#0
-  339:	  813F	D9 FE				djnz	r1, $		;roughly 128k cycles, appox 0.1 sec
-  340:	  8141	D8 FA				djnz	r0, dnlddly2
-  341:	  8143	22				ret
-  342:
-  343:	  8144			dnld_inc:     ;increment parameter specified by R1
-  344:					      ;note, values in Acc and R1 are destroyed
-  345:	  8144	E9				mov	a, r1
-  346:	  8145	54 07				anl	a, #00000111b	;just in case
-  347:	  8147	23				rl	a
-  348:	  8148	24 EC				add	a, #dnld_parm
-  349:	  814A	F9				mov	r1, a		;now r1 points to lsb
-  350:	  814B	07				inc	@r1
-  351:	  814C	E7				mov	a, @r1
-  352:	  814D	70 02				jnz	dnldin2
-  353:	  814F	09				inc	r1
-  354:	  8150	07				inc	@r1
-  355:	  8151	22		dnldin2:	ret
-  356:
-  357:	  8152			dnld_gp:     ;get parameter, and inc to next one (@r1)
-  358:					     ;carry clear if parameter is zero.
-  359:					     ;16 bit value returned in dptr
-  360:	  8152	D3				setb	c
-  361:	  8153	87 82				mov	dp0l, @r1
-  362:	  8155	09				inc	r1
-  363:	  8156	87 83				mov	dp0h, @r1
-  364:	  8158	09				inc	r1
-  365:	  8159	E5 82				mov	a, dp0l
-  366:	  815B	70 05				jnz	dnldgp2
-  367:	  815D	E5 83				mov	a, dph
-  368:	  815F	70 01				jnz	dnldgp2
-  369:	  8161	C3				clr	c
-  370:	  8162	22		dnldgp2:	ret
-  371:
-  372:				;a spacial version of ghex just for the download.  Does not
-  373:				;look for carriage return or backspace.	 Handles ESC key by
-  374:				;poping the return address (I know, nasty, but it saves many
-  375:				;bytes of code in this 4k ROM) and then jumps to the esc
+  320:	  111E	80 73				sjmp	dnld_sum
+  321:
+  322:	  1120			dnld_dly:   ;a short delay since most terminal emulation programs
+  323:					    ;won't be ready to receive anything immediately after
+  324:					    ;they've transmitted a file... even on a fast Pentium(tm)
+  325:					    ;machine with 16550 uarts!
+  326:	  1120	78 00				mov	R0,#0
+  327:	  1122	79 00		dnlddly2:	mov	R1,#0
+  328:	  1124	D9 FE				djnz	r1, $		;roughly 128k cycles, appox 0.1 sec
+  329:	  1126	D8 FA				djnz	r0, dnlddly2
+  330:	  1128	22				ret
+  331:
+  332:	  1129			dnld_inc:     ;increment parameter specified by R1
+  333:					      ;note, values in Acc and R1 are destroyed
+  334:	  1129	E9				mov	a, r1
+  335:	  112A	54 07				anl	a, #00000111b	;just in case
+  336:	  112C	23				rl	a
+  337:	  112D	24 EC				add	a, #dnld_parm
+  338:	  112F	F9				mov	r1, a		;now r1 points to lsb
+  339:	  1130	07				inc	@r1
+  340:	  1131	E7				mov	a, @r1
+  341:	  1132	70 02				jnz	dnldin2
+  342:	  1134	09				inc	r1
+  343:	  1135	07				inc	@r1
+  344:	  1136	22		dnldin2:	ret
+  345:
+  346:	  1137			dnld_gp:     ;get parameter, and inc to next one (@r1)
+  347:					     ;carry clear if parameter is zero.
+  348:					     ;16 bit value returned in dptr
+  349:	  1137	D3				setb	c
+  350:	  1138	87 82				mov	dp0l, @r1
+  351:	  113A	09				inc	r1
+  352:	  113B	87 83				mov	dp0h, @r1
+  353:	  113D	09				inc	r1
+  354:	  113E	E5 82				mov	a, dp0l
+  355:	  1140	70 05				jnz	dnldgp2
+  356:	  1142	E5 83				mov	a, dph
+  357:	  1144	70 01				jnz	dnldgp2
+  358:	  1146	C3				clr	c
+  359:	  1147	22		dnldgp2:	ret
+  360:
+  361:				;a spacial version of ghex just for the download.  Does not
+  362:				;look for carriage return or backspace.	 Handles ESC key by
+  363:				;poping the return address (I know, nasty, but it saves many
+  364:				;bytes of code in this 4k ROM) and then jumps to the esc
+  365:				;key handling.	This ghex doesn't echo characters, and if it
+  366:				;sees ':', it pops the return and jumps to an error handler
+  367:				;for ':' in the middle of a line.  Non-hex digits also jump
+  368:				;to error handlers, depending on which digit.
+  369:
+  370:	  1148			dnld_ghex:
+  371:	  1148	12 00 32	dnldgh1:	call	cin
+  372:	  114B	12 00 40			call	upper
+  373:	  114E	B4 1B 06			cjne	a, #27, dnldgh3
+  374:	  1151	D0 E0		dnldgh2:	pop	acc
+  375:	  1153	D0 E0				pop	acc
 
 ASEM-51 V1.3                                         Copyright (c) 2002 by W.W. Heinz                                         PAGE 8
 
@@ -446,62 +446,62 @@ ASEM-51 V1.3                                         Copyright (c) 2002 by W.W. 
 
  Line  I  Addr  Code            Source
 
-  376:				;key handling.	This ghex doesn't echo characters, and if it
-  377:				;sees ':', it pops the return and jumps to an error handler
-  378:				;for ':' in the middle of a line.  Non-hex digits also jump
-  379:				;to error handlers, depending on which digit.
-  380:
-  381:	  8163			dnld_ghex:
-  382:	  8163	12 00 32	dnldgh1:	call	cin
-  383:	  8166	12 00 40			call	upper
-  384:	  8169	B4 1B 06			cjne	a, #27, dnldgh3
-  385:	  816C	D0 E0		dnldgh2:	pop	acc
-  386:	  816E	D0 E0				pop	acc
-  387:	  8170	80 BF				sjmp	dnld_esc
-  388:	  8172	B4 3A 0A	dnldgh3:	cjne	a, #':', dnldgh5
-  389:	  8175	79 05		dnldgh4:	mov	r1, #5		;handle unexpected beginning of line
-  390:	  8177	31 44				acall	dnld_inc
-  391:	  8179	D0 E0				pop	acc
-  392:	  817B	D0 E0				pop	acc
-  393:	  817D	01 BF				ajmp	dnld3		;and now we're on a new line!
-  394:	  817F	12 00 65	dnldgh5:	call	asc2hex
-  395:	  8182	50 06				jnc	dnldgh6
-  396:	  8184	79 07				mov	r1, #7
-  397:	  8186	31 44				acall	dnld_inc
-  398:	  8188	80 D9				sjmp	dnldgh1
-  399:	  818A	FA		dnldgh6:	mov	r2, a		;keep first digit in r2
-  400:	  818B	12 00 32	dnldgh7:	call	cin
-  401:	  818E	12 00 40			call	upper
-  402:	  8191	B4 1B 02			cjne	a, #27, dnldgh8
-  403:	  8194	80 D6				sjmp	dnldgh2
-  404:	  8196	B4 3A 02	dnldgh8:	cjne	a, #':', dnldgh9
-  405:	  8199	80 DA				sjmp	dnldgh4
-  406:	  819B	12 00 65	dnldgh9:	call	asc2hex
-  407:	  819E	50 06				jnc	dnldghA
-  408:	  81A0	79 07				mov	r1, #7
-  409:	  81A2	31 44				acall	dnld_inc
-  410:	  81A4	80 E5				sjmp	dnldgh7
-  411:	  81A6	CA		dnldghA:	xch	a, r2
-  412:	  81A7	C4				swap	a
-  413:	  81A8	4A				orl	a, r2
-  414:	  81A9	FA				mov	r2, a
-  415:	  81AA	2C				add	a, r4		;add into checksum
-  416:	  81AB	FC				mov	r4, a
-  417:	  81AC	EA				mov	a, r2		;return value in acc
-  418:	  81AD	22				ret
-  419:
-  420:				;dnlds4 =  "Summary:"
-  421:				;dnlds5 =  " lines received"
-  422:				;dnlds6a = " bytes received"
-  423:				;dnlds6b = " bytes written"
-  424:
-  425:	  81AE			dnld_sum:    ;print out download summary
-  426:	  81AE	EE				mov	a, r6
-  427:	  81AF	C0 E0				push	acc
-  428:	  81B1	EF				mov	a, r7
-  429:	  81B2	C0 E0				push	acc
-  430:	  81B4	90 82 A3			mov	dptr, #dnlds4
-  431:	  81B7	12 00 45			call	pcstr_h
+  376:	  1155	80 BF				sjmp	dnld_esc
+  377:	  1157	B4 3A 0A	dnldgh3:	cjne	a, #':', dnldgh5
+  378:	  115A	79 05		dnldgh4:	mov	r1, #5		;handle unexpected beginning of line
+  379:	  115C	31 29				acall	dnld_inc
+  380:	  115E	D0 E0				pop	acc
+  381:	  1160	D0 E0				pop	acc
+  382:	  1162	01 A8				ajmp	dnld3		;and now we're on a new line!
+  383:	  1164	12 00 65	dnldgh5:	call	asc2hex
+  384:	  1167	50 06				jnc	dnldgh6
+  385:	  1169	79 07				mov	r1, #7
+  386:	  116B	31 29				acall	dnld_inc
+  387:	  116D	80 D9				sjmp	dnldgh1
+  388:	  116F	FA		dnldgh6:	mov	r2, a		;keep first digit in r2
+  389:	  1170	12 00 32	dnldgh7:	call	cin
+  390:	  1173	12 00 40			call	upper
+  391:	  1176	B4 1B 02			cjne	a, #27, dnldgh8
+  392:	  1179	80 D6				sjmp	dnldgh2
+  393:	  117B	B4 3A 02	dnldgh8:	cjne	a, #':', dnldgh9
+  394:	  117E	80 DA				sjmp	dnldgh4
+  395:	  1180	12 00 65	dnldgh9:	call	asc2hex
+  396:	  1183	50 06				jnc	dnldghA
+  397:	  1185	79 07				mov	r1, #7
+  398:	  1187	31 29				acall	dnld_inc
+  399:	  1189	80 E5				sjmp	dnldgh7
+  400:	  118B	CA		dnldghA:	xch	a, r2
+  401:	  118C	C4				swap	a
+  402:	  118D	4A				orl	a, r2
+  403:	  118E	FA				mov	r2, a
+  404:	  118F	2C				add	a, r4		;add into checksum
+  405:	  1190	FC				mov	r4, a
+  406:	  1191	EA				mov	a, r2		;return value in acc
+  407:	  1192	22				ret
+  408:
+  409:				;dnlds4 =  "Summary:"
+  410:				;dnlds5 =  " lines received"
+  411:				;dnlds6a = " bytes received"
+  412:				;dnlds6b = " bytes written"
+  413:
+  414:	  1193			dnld_sum:    ;print out download summary
+  415:	  1193	EE				mov	a, r6
+  416:	  1194	C0 E0				push	acc
+  417:	  1196	EF				mov	a, r7
+  418:	  1197	C0 E0				push	acc
+  419:	  1199	90 12 88			mov	dptr, #dnlds4
+  420:	  119C	12 00 45			call	pcstr_h
+  421:	  119F	79 EC				mov	r1, #dnld_parm
+  422:	  11A1	7E 91				mov	r6, #LOW dnlds5
+  423:	  11A3	7F 12				mov	r7, #HIGH dnlds5
+  424:	  11A5	51 02				acall	dnld_i0
+  425:	  11A7	7E 97				mov	r6, #LOW dnlds6a
+  426:	  11A9	7F 12				mov	r7, #HIGH dnlds6a
+  427:	  11AB	51 02				acall	dnld_i0
+  428:	  11AD	7E 9C				mov	r6, #LOW dnlds6b
+  429:	  11AF	7F 12				mov	r7, #HIGH dnlds6b
+  430:	  11B1	51 02				acall	dnld_i0
+  431:
 
 ASEM-51 V1.3                                         Copyright (c) 2002 by W.W. Heinz                                         PAGE 9
 
@@ -509,62 +509,62 @@ ASEM-51 V1.3                                         Copyright (c) 2002 by W.W. 
 
  Line  I  Addr  Code            Source
 
-  432:	  81BA	79 EC				mov	r1, #dnld_parm
-  433:	  81BC	7E AC				mov	r6, #LOW dnlds5
-  434:	  81BE	7F 82				mov	r7, #HIGH dnlds5
-  435:	  81C0	51 1D				acall	dnld_i0
-  436:	  81C2	7E B2				mov	r6, #LOW dnlds6a
-  437:	  81C4	7F 82				mov	r7, #HIGH dnlds6a
-  438:	  81C6	51 1D				acall	dnld_i0
-  439:	  81C8	7E B7				mov	r6, #LOW dnlds6b
-  440:	  81CA	7F 82				mov	r7, #HIGH dnlds6b
-  441:	  81CC	51 1D				acall	dnld_i0
-  442:
-  443:	  81CE			dnld_err:    ;now print out error summary
-  444:	  81CE	7A 05				mov	r2, #5
-  445:	  81D0	31 52		dnlder2:	acall	dnld_gp
-  446:	  81D2	40 0A				jc	dnlder3		;any errors?
-  447:	  81D4	DA FA				djnz	r2, dnlder2
-  448:					 ;no errors, so we print the nice message
-  449:	  81D6	90 82 F3			mov	dptr, #dnlds13
-  450:	  81D9	12 00 45			call	pcstr_h
-  451:	  81DC	80 26				sjmp	dlnd_sum_done
-  452:
-  453:	  81DE			dnlder3:  ;there were errors, so now we print 'em
-  454:	  81DE	90 82 C2			mov	dptr, #dnlds7
-  455:	  81E1	12 00 45			call	pcstr_h
-  456:					  ;but let's not be nasty... only print if necessary
-  457:	  81E4	79 F2				mov	r1, #(dnld_parm+6)
-  458:	  81E6	7E C6				mov	r6, #LOW dnlds8
-  459:	  81E8	7F 82				mov	r7, #HIGH dnlds8
-  460:	  81EA	51 0D				acall	dnld_item
-  461:	  81EC	7E D7				mov	r6, #LOW dnlds9
-  462:	  81EE	7F 82				mov	r7, #HIGH dnlds9
-  463:	  81F0	51 0D				acall	dnld_item
-  464:	  81F2	7E DF				mov	r6, #LOW dnlds10
-  465:	  81F4	7F 82				mov	r7, #HIGH dnlds10
-  466:	  81F6	51 0D				acall	dnld_item
-  467:	  81F8	7E E5				mov	r6, #LOW dnlds11
-  468:	  81FA	7F 82				mov	r7, #HIGH dnlds11
-  469:	  81FC	51 0D				acall	dnld_item
-  470:	  81FE	7E EA				mov	r6, #LOW dnlds12
-  471:	  8200	7F 82				mov	r7, #HIGH dnlds12
-  472:	  8202	51 0D				acall	dnld_item
-  473:	  8204			dlnd_sum_done:
-  474:	  8204	D0 E0				pop	acc
-  475:	  8206	FF				mov	r7, a
-  476:	  8207	D0 E0				pop	acc
-  477:	  8209	FE				mov	r6, a
-  478:	  820A	02 00 48			jmp	newline
-  479:
-  480:	  820D			dnld_item:
-  481:	  820D	31 52				acall	dnld_gp		;error conditions
-  482:	  820F	50 0B				jnc	dnld_i3
-  483:	  8211	12 82 2A	dnld_i2:call	space
-  484:	  8214	12 00 53			lcall	pint16u
-  485:	  8217	51 2F				acall	r6r7todptr
-  486:	  8219	12 00 45			call	pcstr_h
-  487:	  821C	22		dnld_i3:	ret
+  432:	  11B3			dnld_err:    ;now print out error summary
+  433:	  11B3	7A 05				mov	r2, #5
+  434:	  11B5	31 37		dnlder2:	acall	dnld_gp
+  435:	  11B7	40 0A				jc	dnlder3		;any errors?
+  436:	  11B9	DA FA				djnz	r2, dnlder2
+  437:					 ;no errors, so we print the nice message
+  438:	  11BB	90 12 D8			mov	dptr, #dnlds13
+  439:	  11BE	12 00 45			call	pcstr_h
+  440:	  11C1	80 26				sjmp	dlnd_sum_done
+  441:
+  442:	  11C3			dnlder3:  ;there were errors, so now we print 'em
+  443:	  11C3	90 12 A7			mov	dptr, #dnlds7
+  444:	  11C6	12 00 45			call	pcstr_h
+  445:					  ;but let's not be nasty... only print if necessary
+  446:	  11C9	79 F2				mov	r1, #(dnld_parm+6)
+  447:	  11CB	7E AB				mov	r6, #LOW dnlds8
+  448:	  11CD	7F 12				mov	r7, #HIGH dnlds8
+  449:	  11CF	31 F2				acall	dnld_item
+  450:	  11D1	7E BC				mov	r6, #LOW dnlds9
+  451:	  11D3	7F 12				mov	r7, #HIGH dnlds9
+  452:	  11D5	31 F2				acall	dnld_item
+  453:	  11D7	7E C4				mov	r6, #LOW dnlds10
+  454:	  11D9	7F 12				mov	r7, #HIGH dnlds10
+  455:	  11DB	31 F2				acall	dnld_item
+  456:	  11DD	7E CA				mov	r6, #LOW dnlds11
+  457:	  11DF	7F 12				mov	r7, #HIGH dnlds11
+  458:	  11E1	31 F2				acall	dnld_item
+  459:	  11E3	7E CF				mov	r6, #LOW dnlds12
+  460:	  11E5	7F 12				mov	r7, #HIGH dnlds12
+  461:	  11E7	31 F2				acall	dnld_item
+  462:	  11E9			dlnd_sum_done:
+  463:	  11E9	D0 E0				pop	acc
+  464:	  11EB	FF				mov	r7, a
+  465:	  11EC	D0 E0				pop	acc
+  466:	  11EE	FE				mov	r6, a
+  467:	  11EF	02 00 48			jmp	newline
+  468:
+  469:	  11F2			dnld_item:
+  470:	  11F2	31 37				acall	dnld_gp		;error conditions
+  471:	  11F4	50 0B				jnc	dnld_i3
+  472:	  11F6	12 12 0F	dnld_i2:call	space
+  473:	  11F9	12 00 53			lcall	pint16u
+  474:	  11FC	51 14				acall	r6r7todptr
+  475:	  11FE	12 00 45			call	pcstr_h
+  476:	  1201	22		dnld_i3:	ret
+  477:
+  478:	  1202	31 37		dnld_i0:	acall	dnld_gp		;non-error conditions
+  479:	  1204	80 F0				sjmp	dnld_i2
+  480:
+  481:
+  482:	  1206			dnld_init:
+  483:					;init all dnld parms to zero.
+  484:	  1206	78 EC				mov	r0, #dnld_parm
+  485:	  1208	76 00		dnld0:		mov	@r0, #0
+  486:	  120A	08				inc	r0
+  487:	  120B	B8 FC FA			cjne	r0, #dnld_parm + 16, dnld0
 
 ASEM-51 V1.3                                        Copyright (c) 2002 by W.W. Heinz                                         PAGE 10
 
@@ -572,62 +572,62 @@ ASEM-51 V1.3                                        Copyright (c) 2002 by W.W. H
 
  Line  I  Addr  Code            Source
 
-  488:
-  489:	  821D	31 52		dnld_i0:	acall	dnld_gp		;non-error conditions
-  490:	  821F	80 F0				sjmp	dnld_i2
-  491:
+  488:	  120E	22				ret
+  489:
+  490:	  120F	74 20		space:		mov	a, #' '
+  491:	  1211	02 00 30			JMP	COUT
   492:
-  493:	  8221			dnld_init:
-  494:					;init all dnld parms to zero.
-  495:	  8221	78 EC				mov	r0, #dnld_parm
-  496:	  8223	76 00		dnld0:		mov	@r0, #0
-  497:	  8225	08				inc	r0
-  498:	  8226	B8 FC FA			cjne	r0, #dnld_parm + 16, dnld0
-  499:	  8229	22				ret
-  500:
-  501:	  822A	74 20		space:		mov	a, #' '
-  502:	  822C	02 00 30			JMP	COUT
-  503:
-  504:	  822F			r6r7todptr:
-  505:	  822F	8E 82				mov	dpl, r6
-  506:	  8231	8F 83				mov	dph, r7
-  507:	  8233	22				ret
-  508:
-  509:
-  510:	  8234	7E 00		TIME35MS:	MOV	R6,#0
-  511:	  8236	7F 00		TIME35MS2:	MOV	R7,#0
-  512:	  8238	DF FE		TIME35MS1:	DJNZ	R7,TIME35MS1
-  513:	  823A	DE FC				DJNZ	R6,TIME35MS1
-  514:	  823C	22				RET
-  515:
-  516:	  823D	7E 12		TIME5MS:	MOV	R6,#18
-  517:	  823F	41 36				AJMP	TIME35MS2
-  518:
-  519:	  8241	0D 0A 45 53	MSGMENU:	DB	13,10,"ESIM 8k - Menu",13,10
-	  8245	49 4D 20 38
-	  8249	6B 20 2D 20
-	  824D	4D 65 6E 75
-	  8251	0D 0A
-  520:	  8253	44 20 2D 20			DB	"D - Download Intel-Hex to RAM",13,10
-	  8257	44 6F 77 6E
-	  825B	6C 6F 61 64
-	  825F	20 49 6E 74
-	  8263	65 6C 2D 48
-	  8267	65 78 20 74
-	  826B	6F 20 52 41
-	  826F	4D 0D 0A
-  521:	  8272	58 20 2D 20			DB	"X - Exit"
-	  8276	45 78 69 74
-  522:	  827A	0D 0A 00			DB	13, 10, 0
-  523:
-  524:	  827D	0D 0D 1F 9F	dnlds1: 	db	13,13,31,159," ascii",249,150,31,152,132,137
-	  8281	20 61 73 63
-	  8285	69 69 F9 96
-	  8289	1F 98 84 89
-  525:	  828D	2C 95 8C 80			db	",",149,140,128,160,13,14
-	  8291	A0 0D 0E
-  526:	  8294	0D 1F 8A A0	dnlds2: 	db	13,31,138,160,"ed",13,14
-	  8298	65 64 0D 0E
+  493:	  1214			r6r7todptr:
+  494:	  1214	8E 82				mov	dpl, r6
+  495:	  1216	8F 83				mov	dph, r7
+  496:	  1218	22				ret
+  497:
+  498:
+  499:	  1219	7E 00		TIME35MS:	MOV	R6,#0
+  500:	  121B	7F 00		TIME35MS2:	MOV	R7,#0
+  501:	  121D	DF FE		TIME35MS1:	DJNZ	R7,TIME35MS1
+  502:	  121F	DE FC				DJNZ	R6,TIME35MS1
+  503:	  1221	22				RET
+  504:
+  505:	  1222	7E 12		TIME5MS:	MOV	R6,#18
+  506:	  1224	41 1B				AJMP	TIME35MS2
+  507:
+  508:	  1226	0D 0A 45 53	MSGMENU:	DB	13,10,"ESIM 8k - Menu",13,10
+	  122A	49 4D 20 38
+	  122E	6B 20 2D 20
+	  1232	4D 65 6E 75
+	  1236	0D 0A
+  509:	  1238	44 20 2D 20			DB	"D - Download Intel-Hex to RAM",13,10
+	  123C	44 6F 77 6E
+	  1240	6C 6F 61 64
+	  1244	20 49 6E 74
+	  1248	65 6C 2D 48
+	  124C	65 78 20 74
+	  1250	6F 20 52 41
+	  1254	4D 0D 0A
+  510:	  1257	58 20 2D 20			DB	"X - Exit"
+	  125B	45 78 69 74
+  511:	  125F	0D 0A 00			DB	13, 10, 0
+  512:
+  513:	  1262	0D 0D 1F 9F	dnlds1: 	db	13,13,31,159," ascii",249,150,31,152,132,137
+	  1266	20 61 73 63
+	  126A	69 69 F9 96
+	  126E	1F 98 84 89
+  514:	  1272	2C 95 8C 80			db	",",149,140,128,160,13,14
+	  1276	A0 0D 0E
+  515:	  1279	0D 1F 8A A0	dnlds2: 	db	13,31,138,160,"ed",13,14
+	  127D	65 64 0D 0E
+  516:	  1281	0D 1F 8A C1	dnlds3: 	DB	13,31,138,193,"d",13,14
+	  1285	64 0D 0E
+  517:	  1288	53 75 6D 6D	dnlds4: 	DB	"Summary:",14
+	  128C	61 72 79 3A
+	  1290	0E
+  518:	  1291	20 C6 73 91	dnlds5: 	DB	" ",198,"s",145,"d",14
+	  1295	64 0E
+  519:	  1297	20 8B 91 64	dnlds6a:	DB	" ",139,145,"d",14
+	  129B	0E
+  520:	  129C	20 8B 20 77	dnlds6b:	DB	" ",139," written",14
+	  12A0	72 69 74 74
 
 ASEM-51 V1.3                                        Copyright (c) 2002 by W.W. Heinz                                         PAGE 11
 
@@ -635,42 +635,31 @@ ASEM-51 V1.3                                        Copyright (c) 2002 by W.W. H
 
  Line  I  Addr  Code            Source
 
-  527:	  829C	0D 1F 8A C1	dnlds3: 	DB	13,31,138,193,"d",13,14
-	  82A0	64 0D 0E
-  528:	  82A3	53 75 6D 6D	dnlds4: 	DB	"Summary:",14
-	  82A7	61 72 79 3A
-	  82AB	0E
-  529:	  82AC	20 C6 73 91	dnlds5: 	DB	" ",198,"s",145,"d",14
-	  82B0	64 0E
-  530:	  82B2	20 8B 91 64	dnlds6a:	DB	" ",139,145,"d",14
-	  82B6	0E
-  531:	  82B7	20 8B 20 77	dnlds6b:	DB	" ",139," written",14
-	  82BB	72 69 74 74
-	  82BF	65 6E 0E
-  532:	  82C2	1F 9B 3A 0E	dnlds7: 	DB	31,155,":",14
-  533:	  82C6	20 8B 20 75	dnlds8: 	DB	" ",139," unable",128," write",14
-	  82CA	6E 61 62 6C
-	  82CE	65 80 20 77
-	  82D2	72 69 74 65
-	  82D6	0E
-  534:	  82D7	20 20 62 61	dnlds9: 	DB	32,32,"bad",245,"s",14
-	  82DB	64 F5 73 0E
-  535:	  82DF	20 85 9F 96	dnlds10:	DB	" ",133,159,150,198,14
-	  82E3	C6 0E
-  536:	  82E5	20 85 84 9D	dnlds11:	DB	" ",133,132,157,14
-	  82E9	0E
-  537:	  82EA	20 85 20 6E	dnlds12:	DB	" ",133," non",132,157,14
-	  82EE	6F 6E 84 9D
-	  82F2	0E
-  538:	  82F3	1F 97 9B 20	dnlds13:	DB	31,151,155," detected",13,14
-	  82F7	64 65 74 65
-	  82FB	63 74 65 64
-	  82FF	0D 0E
-  539:
-  540:		N      007F	TEMP		EQU	127
-  541:		N      00EC	dnld_parm	EQU	236
-  542:
-  543:						END
+	  12A4	65 6E 0E
+  521:	  12A7	1F 9B 3A 0E	dnlds7: 	DB	31,155,":",14
+  522:	  12AB	20 8B 20 75	dnlds8: 	DB	" ",139," unable",128," write",14
+	  12AF	6E 61 62 6C
+	  12B3	65 80 20 77
+	  12B7	72 69 74 65
+	  12BB	0E
+  523:	  12BC	20 20 62 61	dnlds9: 	DB	32,32,"bad",245,"s",14
+	  12C0	64 F5 73 0E
+  524:	  12C4	20 85 9F 96	dnlds10:	DB	" ",133,159,150,198,14
+	  12C8	C6 0E
+  525:	  12CA	20 85 84 9D	dnlds11:	DB	" ",133,132,157,14
+	  12CE	0E
+  526:	  12CF	20 85 20 6E	dnlds12:	DB	" ",133," non",132,157,14
+	  12D3	6F 6E 84 9D
+	  12D7	0E
+  527:	  12D8	1F 97 9B 20	dnlds13:	DB	31,151,155," detected",13,14
+	  12DC	64 65 74 65
+	  12E0	63 74 65 64
+	  12E4	0D 0E
+  528:
+  529:		N      007F	TEMP		EQU	127
+  530:		N      00EC	dnld_parm	EQU	236
+  531:
+  532:						END
 
 
 
@@ -710,41 +699,41 @@ COUT				  NUMBER    0030	 106
 CPRL2				  BIT	      C8	  81
 CT2				  BIT	      C9	  82
 CY				  BIT	      D7	  95
-DLND_SUM_DONE			  CODE	    8204	 473
-DNLD				  CODE	    8094	 218
-DNLD0				  CODE	    8223	 496
-DNLD1				  CODE	    809C	 224
-DNLD2				  CODE	    80A4	 228
-DNLD2B				  CODE	    80A9	 230
-DNLD2D				  CODE	    80BB	 242
-DNLD3				  CODE	    80BF	 246
-DNLD3_B				  CODE	    80CB	 254
-DNLD4				  CODE	    80D8	 260
-DNLD5				  CODE	    80DA	 261
-DNLDDLY2			  CODE	    813D	 338
-DNLDER2				  CODE	    81D0	 445
-DNLDER3				  CODE	    81DE	 453
-DNLDGH1				  CODE	    8163	 382
-DNLDGH2				  CODE	    816C	 385
-DNLDGH3				  CODE	    8172	 388
-DNLDGH4				  CODE	    8175	 389
-DNLDGH5				  CODE	    817F	 394
-DNLDGH6				  CODE	    818A	 399
-DNLDGH7				  CODE	    818B	 400
-DNLDGH8				  CODE	    8196	 404
-DNLDGH9				  CODE	    819B	 406
-DNLDGHA				  CODE	    81A6	 411
-DNLDGP2				  CODE	    8162	 370
-DNLDIN2				  CODE	    8151	 355
-DNLDS1				  CODE	    827D	 524
-DNLDS10				  CODE	    82DF	 535
-DNLDS11				  CODE	    82E5	 536
-DNLDS12				  CODE	    82EA	 537
-DNLDS13				  CODE	    82F3	 538
-DNLDS2				  CODE	    8294	 526
-DNLDS3				  CODE	    829C	 527
-DNLDS4				  CODE	    82A3	 528
-DNLDS5				  CODE	    82AC	 529
+DLND_SUM_DONE			  CODE	    11E9	 462
+DNLD				  CODE	    107D	 209
+DNLD0				  CODE	    1208	 485
+DNLD1				  CODE	    1085	 215
+DNLD2				  CODE	    108D	 219
+DNLD2B				  CODE	    1092	 221
+DNLD2D				  CODE	    10A4	 233
+DNLD3				  CODE	    10A8	 237
+DNLD3_B				  CODE	    10B4	 245
+DNLD4				  CODE	    10C1	 251
+DNLD5				  CODE	    10C3	 252
+DNLDDLY2			  CODE	    1122	 327
+DNLDER2				  CODE	    11B5	 434
+DNLDER3				  CODE	    11C3	 442
+DNLDGH1				  CODE	    1148	 371
+DNLDGH2				  CODE	    1151	 374
+DNLDGH3				  CODE	    1157	 377
+DNLDGH4				  CODE	    115A	 378
+DNLDGH5				  CODE	    1164	 383
+DNLDGH6				  CODE	    116F	 388
+DNLDGH7				  CODE	    1170	 389
+DNLDGH8				  CODE	    117B	 393
+DNLDGH9				  CODE	    1180	 395
+DNLDGHA				  CODE	    118B	 400
+DNLDGP2				  CODE	    1147	 359
+DNLDIN2				  CODE	    1136	 344
+DNLDS1				  CODE	    1262	 513
+DNLDS10				  CODE	    12C4	 524
+DNLDS11				  CODE	    12CA	 525
+DNLDS12				  CODE	    12CF	 526
+DNLDS13				  CODE	    12D8	 527
+DNLDS2				  CODE	    1279	 515
+DNLDS3				  CODE	    1281	 516
+DNLDS4				  CODE	    1288	 517
+DNLDS5				  CODE	    1291	 518
 
 ASEM-51 V1.3                                        Copyright (c) 2002 by W.W. Heinz                                         PAGE 13
 
@@ -752,44 +741,43 @@ ASEM-51 V1.3                                        Copyright (c) 2002 by W.W. H
 
 SYMBOL				  TYPE     VALUE	LINE
 ------------------------------------------------------------
-DNLDS6A				  CODE	    82B2	 530
-DNLDS6B				  CODE	    82B7	 531
-DNLDS7				  CODE	    82C2	 532
-DNLDS8				  CODE	    82C6	 533
-DNLDS9				  CODE	    82D7	 534
-DNLD_DLY			  CODE	    813B	 333
-DNLD_END			  CODE	    8113	 304
-DNLD_END_2			  CODE	    8116	 307
-DNLD_END_3			  CODE	    811A	 310
-DNLD_END_4			  CODE	    812C	 321
-DNLD_ERR			  CODE	    81CE	 443
-DNLD_ESC			  CODE	    8131	 327
-DNLD_GET_CKSUM			  CODE	    80FC	 286
-DNLD_GHEX			  CODE	    8163	 381
-DNLD_GP				  CODE	    8152	 357
-DNLD_I0				  CODE	    821D	 489
-DNLD_I2				  CODE	    8211	 483
-DNLD_I3				  CODE	    821C	 487
-DNLD_INC			  CODE	    8144	 343
-DNLD_INIT			  CODE	    8221	 493
-DNLD_ITEM			  CODE	    820D	 480
-DNLD_NOW			  CODE	    80B4	 237
-DNLD_PARM			  NUMBER    00EC	 541
-DNLD_SUM			  CODE	    81AE	 425
-DNLD_SUMERR			  CODE	    8101	 290
-DNLD_UKN2			  CODE	    810D	 299
-DNLD_UNKNOWN			  CODE	    810A	 296
+DNLDS6A				  CODE	    1297	 519
+DNLDS6B				  CODE	    129C	 520
+DNLDS7				  CODE	    12A7	 521
+DNLDS8				  CODE	    12AB	 522
+DNLDS9				  CODE	    12BC	 523
+DNLD_DLY			  CODE	    1120	 322
+DNLD_END			  CODE	    10F8	 293
+DNLD_END_2			  CODE	    10FB	 296
+DNLD_END_3			  CODE	    10FF	 299
+DNLD_END_4			  CODE	    1111	 310
+DNLD_ERR			  CODE	    11B3	 432
+DNLD_ESC			  CODE	    1116	 316
+DNLD_GET_CKSUM			  CODE	    10E1	 275
+DNLD_GHEX			  CODE	    1148	 370
+DNLD_GP				  CODE	    1137	 346
+DNLD_I0				  CODE	    1202	 478
+DNLD_I2				  CODE	    11F6	 472
+DNLD_I3				  CODE	    1201	 476
+DNLD_INC			  CODE	    1129	 332
+DNLD_INIT			  CODE	    1206	 482
+DNLD_ITEM			  CODE	    11F2	 469
+DNLD_NOW			  CODE	    109D	 228
+DNLD_PARM			  NUMBER    00EC	 530
+DNLD_SUM			  CODE	    1193	 414
+DNLD_SUMERR			  CODE	    10E6	 279
+DNLD_UKN2			  CODE	    10F2	 288
+DNLD_UNKNOWN			  CODE	    10EF	 285
 DP0H				  DATA	      83	   9
 DP0L				  DATA	      82	   8
 DP1H				  DATA	      85	  11
 DP1L				  DATA	      84	  10
-DPH				  NUMBER    0083	 148
-DPL				  NUMBER    0082	 147
+DPH				  NUMBER    0083	 153
+DPL				  NUMBER    0082	 152
 EA				  BIT	      AF	  66
 ERALL				  NUMBER    005C	 131
 ES				  BIT	      AC	  64
 ESC				  NUMBER    003E	 117
-ESIMENABLE			  CODE	    807F	 204
 ET0				  BIT	      A9	  61
 ET1				  BIT	      AB	  63
 ET2				  BIT	      AD	  65
@@ -806,8 +794,9 @@ GHEX16				  NUMBER    003C	 115
 IE				  DATA	      A8	  26
 IE0				  BIT	      89	  40
 IE1				  BIT	      8B	  42
-INITPORTS			  CODE	    8056	 178
+INITPORTS			  CODE	    1056	 183
 INT0				  BIT	      B2	  69
+INT1				  BIT	      B3	  70
 
 ASEM-51 V1.3                                        Copyright (c) 2002 by W.W. Heinz                                         PAGE 14
 
@@ -815,19 +804,18 @@ ASEM-51 V1.3                                        Copyright (c) 2002 by W.W. H
 
 SYMBOL				  TYPE     VALUE	LINE
 ------------------------------------------------------------
-INT1				  BIT	      B3	  70
 IP				  DATA	      B8	  28
 IT0				  BIT	      88	  39
 IT1				  BIT	      8A	  41
 LENSTR				  NUMBER    004A	 125
-LOCAT				  NUMBER    8000	 150
-MENU				  CODE	    8042	 169
-MENUD				  CODE	    804B	 172
-MENULOOP			  CODE	    8048	 171
-MENUX				  CODE	    8052	 175
+LOCAT				  NUMBER    1000	 155
+MENU				  CODE	    1042	 174
+MENUD				  CODE	    104B	 177
+MENULOOP			  CODE	    1048	 176
+MENUX				  CODE	    1052	 180
 MISO				  BIT	      96	  50
 MOSI				  BIT	      95	  49
-MSGMENU				  CODE	    8241	 519
+MSGMENU				  CODE	    1226	 508
 NEWLINE				  NUMBER    0048	 124
 OV				  BIT	      D2	  90
 P				  BIT	      D0	  89
@@ -853,15 +841,14 @@ PT1				  BIT	      BB	  78
 PT2				  BIT	      BD	  80
 PX0				  BIT	      B8	  75
 PX1				  BIT	      BA	  77
-R6R7TODPTR			  CODE	    822F	 504
+R6R7TODPTR			  CODE	    1214	 493
+RAMCE				  NUMBER    00B2	 141
+RAMWE				  NUMBER    00B3	 142
 RB8				  BIT	      9A	  54
 RCAP2H				  DATA	      CB	  32
 RCAP2L				  DATA	      CA	  31
 RCLK				  BIT	      CD	  86
 RD				  BIT	      B7	  74
-REGA				  NUMBER    00B3	 137
-REGB				  NUMBER    00B4	 138
-REGSTROBE			  CODE	    8083	 207
 REN				  BIT	      9C	  56
 RESET				  CODE	    0000	  97
 RI				  BIT	      98	  52
@@ -871,6 +858,8 @@ RXD				  BIT	      B0	  67
 SBUF				  DATA	      99	  22
 SCK				  BIT	      97	  51
 SCON				  DATA	      98	  21
+SIM				  NUMBER    00B4	 143
+SINT				  CODE	    0023	 102
 
 ASEM-51 V1.3                                        Copyright (c) 2002 by W.W. Heinz                                         PAGE 15
 
@@ -878,13 +867,12 @@ ASEM-51 V1.3                                        Copyright (c) 2002 by W.W. H
 
 SYMBOL				  TYPE     VALUE	LINE
 ------------------------------------------------------------
-SINT				  CODE	    0023	 102
 SM0				  BIT	      9F	  59
 SM1				  BIT	      9E	  58
 SM2				  BIT	      9D	  57
 SMART_WR			  NUMBER    0056	 129
 SP				  DATA	      81	   7
-SPACE				  CODE	    822A	 501
+SPACE				  CODE	    120F	 490
 T0				  BIT	      B4	  71
 T1				  BIT	      B5	  72
 T2				  BIT	      90	  47
@@ -894,7 +882,7 @@ T2MOD				  DATA	      C9	  30
 TB8				  BIT	      9B	  55
 TCLK				  BIT	      CC	  85
 TCON				  DATA	      88	  13
-TEMP				  NUMBER    007F	 540
+TEMP				  NUMBER    007F	 529
 TF0				  BIT	      8D	  44
 TF1				  BIT	      8F	  46
 TF2				  BIT	      CF	  88
@@ -902,10 +890,10 @@ TH0				  DATA	      8C	  17
 TH1				  DATA	      8D	  18
 TH2				  DATA	      CD	  34
 TI				  BIT	      99	  53
-TIME35MS			  CODE	    8234	 510
-TIME35MS1			  CODE	    8238	 512
-TIME35MS2			  CODE	    8236	 511
-TIME5MS				  CODE	    823D	 516
+TIME35MS			  CODE	    1219	 499
+TIME35MS1			  CODE	    121D	 501
+TIME35MS2			  CODE	    121B	 500
+TIME5MS				  CODE	    1222	 505
 TIMER0				  CODE	    000B	  99
 TIMER1				  CODE	    001B	 101
 TIMER2				  CODE	    002B	 103
@@ -920,9 +908,7 @@ TXD				  BIT	      B1	  68
 UPPER				  NUMBER    0040	 119
 WDTRST				  DATA	      A6	  25
 WR				  BIT	      B6	  73
-WRITEADRHI			  CODE	    806C	 191
-WRITEADRLO			  CODE	    8072	 195
-WRITEDATA			  CODE	    8078	 199
-WRITEHEX			  CODE	    808A	 212
-WRITERAM			  NUMBER    00B5	 139
-WRITEREG			  NUMBER    00B2	 136
+WRITEADRHI			  CODE	    1065	 190
+WRITEADRLO			  CODE	    1068	 193
+WRITEDATA			  CODE	    106B	 196
+WRITEHEX			  CODE	    1072	 202

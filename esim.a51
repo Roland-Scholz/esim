@@ -2,10 +2,15 @@
 		$INCLUDE (89S52.MCU)
 		$INCLUDE (PAULMON.INC)
 
-WRITEREG	EQU	P3.2			;violett
-REGA		EQU	P3.3			;gray
-REGB		EQU	P3.4			;violett
-WRITERAM	EQU	P3.5			;green
+;WRITEREG	EQU	P3.2			;violett
+;REGA		EQU	P3.3			;gray
+;REGB		EQU	P3.4			;violett
+;WRITERAM	EQU	P3.5			;green
+
+RAMCE		EQU	P3.2			;RAM CE signal
+RAMWE		EQU	P3.3			;RAM write signal
+SIM		EQU	P3.4			;0 = SIM, 1=write RAM
+
 
 ; REGB	REGA	register
 ; 0	0	ADRHI
@@ -16,9 +21,9 @@ WRITERAM	EQU	P3.5			;green
 dpl		EQU	dp0l
 dph		EQU	dp0h
 	
-LOCAT		EQU	08000h
+LOCAT		EQU	01000h
 		
-;		ORG	8000h
+;		ORG	1000h
 
 		ORG    LOCAT
 		DB     0A5H,0E5H,0E0H,0A5H     ;SIGNITURE BYTES
@@ -44,45 +49,31 @@ MENUD:		CJNE	A,#"d",MENUX
 MENUX:		CJNE	A,#"x",MENULOOP
 		RET
 		
-INITPORTS:	MOV	P3, #255
-		MOV	A, #1
-		ACALL	ESIMENABLE
-		CLR	A
-		ACALL	WRITEADRLO
-		ACALL	WRITEADRHI
-		ACALL	WRITEDATA
-		CLR	WRITERAM
-		SETB	WRITERAM
-		CLR	A
-		ACALL	ESIMENABLE
+INITPORTS:	MOV	P0, #255
+		MOV	P1, #255
+		MOV	P2, #255
+		MOV	P3, #255
+		CLR	SIM
 		RET
 
-WRITEADRHI:	CLR	REGA
-		CLR	REGB
-		AJMP	REGSTROBE		
+WRITEADRHI:	MOV	P2, A
+		RET		
 
-WRITEADRLO:	SETB	REGA
-		CLR	REGB
-		AJMP	REGSTROBE		
+WRITEADRLO:	MOV	P1, A
+		RET		
 
-WRITEDATA:	CLR	REGA
-		NOP
-		SETB	REGB
-		AJMP	REGSTROBE		
-
-ESIMENABLE:	SETB	REGA
-		SETB	REGB
-
-REGSTROBE:	MOV	P1,A
-		CLR	WRITEREG
-		SETB	WRITEREG
+WRITEDATA:	MOV	P0, A
+		CLR	RAMWE
+		SETB	RAMWE
 		RET
 
-WRITEHEX:	MOV	A,#1
-		ACALL	ESIMENABLE
+
+WRITEHEX:	MOV	P3, #255		;enable ESIM
+		CLR	RAMCE
 		ACALL	dnld
-		MOV	A,#0
-		AJMP	ESIMENABLE
+		SETB	RAMCE
+		AJMP	INITPORTS			
+		
 		
 dnld:	
 		mov	dptr, #dnlds1		 
@@ -133,16 +124,14 @@ dnld5:		mov	a, r0
 		mov	r2, a
 		mov	r1, #1
 		acall	dnld_inc	;count total data bytes received
-		mov	a, r2
 
 		;lcall	smart_wr	;c=1 if an error writing
-		ACALL	WRITEDATA
 		MOV	A, dp0l	
 		ACALL	WRITEADRLO
 		MOV	A, dp0h
 		ACALL	WRITEADRHI
-		CLR	WRITERAM
-		SETB	WRITERAM
+		mov	a, r2
+		ACALL	WRITEDATA
 
 		clr	a
 		addc	a, #2
