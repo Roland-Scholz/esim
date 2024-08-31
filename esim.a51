@@ -11,6 +11,9 @@ RAMCE		EQU	P3.2			;RAM CE signal
 RAMWE		EQU	P3.3			;RAM write signal
 SIM		EQU	P3.4			;0 = SIM, 1=write RAM
 
+DATPORT		EQU	P0
+ADRLO		EQU	P1
+ADRHI		EQU	P2
 
 ; REGB	REGA	register
 ; 0	0	ADRHI
@@ -49,29 +52,26 @@ MENUD:		CJNE	A,#"d",MENUX
 MENUX:		CJNE	A,#"x",MENULOOP
 		RET
 		
-INITPORTS:	MOV	P0, #255
-		MOV	P1, #255
-		MOV	P2, #255
-		MOV	P3, #255
+INITPORTS:	SETB	RAMCE
+		SETB	RAMWE
+		
+		MOV	DATPORT, #255
+		MOV	ADRLO, #255
+		MOV	ADRHI, #255
+
 		CLR	SIM
 		RET
+	
 
-WRITEADRHI:	MOV	P2, A
-		RET		
-
-WRITEADRLO:	MOV	P1, A
-		RET		
-
-WRITEDATA:	MOV	P0, A
+WRITEDATA:	MOV	DATPORT, A
 		CLR	RAMWE
 		SETB	RAMWE
 		RET
 
 
-WRITEHEX:	MOV	P3, #255		;enable ESIM
+WRITEHEX:	SETB	SIM
 		CLR	RAMCE
 		ACALL	dnld
-		SETB	RAMCE
 		AJMP	INITPORTS			
 		
 		
@@ -126,13 +126,13 @@ dnld5:		mov	a, r0
 		acall	dnld_inc	;count total data bytes received
 
 		;lcall	smart_wr	;c=1 if an error writing
-		MOV	A, dp0l	
-		ACALL	WRITEADRLO
-		MOV	A, dp0h
-		ACALL	WRITEADRHI
-		mov	a, r2
-		ACALL	WRITEDATA
-
+		mov	ADRLO, dp0l	;set address-lo
+		mov	ADRHI, dp0h	;set address-hi
+;		mov	a, r2
+		MOV	DATPORT, r2
+		CLR	RAMWE
+		SETB	RAMWE
+		
 		clr	a
 		addc	a, #2
 		mov	r1, a
